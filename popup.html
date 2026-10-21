@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Design2MD Pro</title>
+  <link rel="stylesheet" href="popup.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-wrapper">
+    <!-- Ambient Background Light -->
+    <div class="ambient-glow"></div>
+
+    <!-- Header Bar -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-emblem">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+            <polyline points="2 17 12 22 22 17"/>
+            <polyline points="2 12 12 17 22 12"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <div class="brand-title-row">
+            <span class="brand-title">Design2MD</span>
+            <span class="pro-tag">PRO</span>
+          </div>
+          <span class="brand-desc">Deep UI & Clone Engine</span>
+        </div>
+      </div>
+
+      <div class="status-indicator" id="statusBadge">
+        <span class="radar-dot"></span>
+        <span id="statusText">READY</span>
+      </div>
+    </header>
+
+    <!-- Target Site Glass Card -->
+    <div class="site-card">
+      <div class="site-card-top">
+        <div class="site-meta">
+          <span class="site-label">ACTIVE TARGET</span>
+          <h2 id="siteDomain" class="site-domain">Inspecting page...</h2>
+          <p id="siteTitle" class="site-title">Fetching DOM tokens...</p>
+        </div>
+        <div id="themePill" class="theme-pill">Scanning...</div>
+      </div>
+
+      <!-- Live Micro-Metrics -->
+      <div class="metrics-strip">
+        <div class="metric-item">
+          <span class="metric-val" id="statColors">—</span>
+          <span class="metric-lbl">Colors</span>
+        </div>
+        <div class="metric-divider"></div>
+        <div class="metric-item">
+          <span class="metric-val" id="statFonts">—</span>
+          <span class="metric-lbl">Fonts</span>
+        </div>
+        <div class="metric-divider"></div>
+        <div class="metric-item">
+          <span class="metric-val" id="statSections">—</span>
+          <span class="metric-lbl">Sections</span>
+        </div>
+        <div class="metric-divider"></div>
+        <div class="metric-item">
+          <span class="metric-val" id="statComponents">—</span>
+          <span class="metric-lbl">Components</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- DUAL EXPORT HUB (The Star of the Show) -->
+    <div class="export-hub">
+      <div class="hub-header">
+        <span class="hub-title">CLONE EXPORT CENTER</span>
+        <span class="hub-sub">Select what you want to extract</span>
+      </div>
+
+      <div class="export-grid">
+        <!-- Card 1: DESIGN.md -->
+        <div class="export-card card-design">
+          <div class="export-card-header">
+            <div class="card-icon-bubble design-bubble">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 2a14.5 14.5 0 0 0 0 20 10 10 0 0 0 0-20"/>
+                <path d="M2 12h20"/>
+              </svg>
+            </div>
+            <div>
+              <div class="card-doc-name">DESIGN.md</div>
+              <div class="card-doc-type">Tokens & Visual System</div>
+            </div>
+          </div>
+          <p class="export-card-desc">Master :root CSS tokens, palette, typography scale & Anti-AI quality rules.</p>
+          <div class="export-card-actions">
+            <button id="downloadDesignBtn" class="btn-card-action btn-design">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              <span>Download DESIGN.md</span>
+            </button>
+            <button id="copyTokensBtn" class="btn-card-ghost" title="Copy :root CSS variables">
+              <span>Copy :root CSS</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Card 2: UI.md -->
+        <div class="export-card card-ui">
+          <div class="export-card-header">
+            <div class="card-icon-bubble ui-bubble">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <line x1="3" y1="9" x2="21" y2="9"/>
+                <line x1="9" y1="21" x2="9" y2="9"/>
+              </svg>
+            </div>
+            <div>
+              <div class="card-doc-name">UI.md</div>
+              <div class="card-doc-type">Sections & Wireframe</div>
+            </div>
+          </div>
+          <p class="export-card-desc">Exact section-by-section breakdown (Hero, Bento, FAQ) + HTML/CSS starters.</p>
+          <div class="export-card-actions">
+            <button id="downloadUiBtn" class="btn-card-action btn-ui">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              <span>Download UI.md</span>
+            </button>
+            <button id="copySectionsBtn" class="btn-card-ghost" title="Copy sections wireframe">
+              <span>Copy Sections</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Master Actions -->
+      <div class="master-action-row">
+        <button id="copyPromptBtn" class="btn-master-prompt" title="Copy full AI prompt for Antigravity / Cursor">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+            <line x1="12" y1="22.08" x2="12" y2="12"/>
+          </svg>
+          <span>Copy Antigravity Master Prompt</span>
+        </button>
+
+        <button id="downloadFullMdBtn" class="btn-master-full" title="Download combined All-in-One spec">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          <span>Full Spec</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Segmented Tab Switcher -->
+    <div class="segmented-tabs">
+      <button class="seg-tab active" data-tab="palette">Palette</button>
+      <button class="seg-tab" data-tab="typography">Type</button>
+      <button class="seg-tab" data-tab="sections">Sections</button>
+      <button class="seg-tab" data-tab="components">Comps</button>
+      <button class="seg-tab" data-tab="preview">Preview</button>
+    </div>
+
+    <!-- TAB 1: PALETTE -->
+    <div id="tab-palette" class="tab-pane active">
+      <div class="pane-section-title">Surface & Canvas Tones</div>
+      <div id="bgSwatches" class="swatches-grid"></div>
+
+      <div class="pane-section-title" style="margin-top:10px">Text & Typography Tones</div>
+      <div id="textSwatches" class="swatches-grid"></div>
+
+      <div id="gradientSection" class="gradient-section hidden">
+        <div class="pane-section-title" style="margin-top:10px">Gradients & Accents</div>
+        <div id="gradientPreviews" class="gradient-previews"></div>
+      </div>
+    </div>
+
+    <!-- TAB 2: TYPOGRAPHY -->
+    <div id="tab-typography" class="tab-pane hidden">
+      <div id="fontPills" class="font-pills"></div>
+      <div id="typeScale" class="type-scale"></div>
+    </div>
+
+    <!-- TAB 3: SECTIONS -->
+    <div id="tab-sections" class="tab-pane hidden">
+      <div class="sections-intro">
+        <span>Detected page landmarks in scroll order:</span>
+      </div>
+      <div id="sectionsList" class="sections-list"></div>
+    </div>
+
+    <!-- TAB 4: COMPONENTS -->
+    <div id="tab-components" class="tab-pane hidden">
+      <div id="componentsList" class="components-list"></div>
+    </div>
+
+    <!-- TAB 5: PREVIEW -->
+    <div id="tab-preview" class="tab-pane hidden">
+      <div class="preview-doc-tabs">
+        <button id="viewDesignTab" class="preview-doc-tab active">DESIGN.md</button>
+        <button id="viewUiTab" class="preview-doc-tab">UI.md</button>
+        <button id="viewFullTab" class="preview-doc-tab">FULL_CLONE.md</button>
+        <button id="copyActivePreviewBtn" class="preview-copy-btn">Copy View</button>
+      </div>
+      <pre id="previewCode" class="preview-code"></pre>
+    </div>
+
+    <!-- Luxury Toast Notification -->
+    <div id="toast" class="toast">Copied to clipboard</div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
