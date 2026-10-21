@@ -222,6 +222,36 @@ body {
   100% { transform: scale(0.9); opacity: 0.8; }
 }
 
+/* ─── Demo Mode Banner ─── */
+.demo-banner {
+  background: #FFFBEB;
+  border: 1px solid #FCD34D;
+  color: #B45309;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.4;
+}
+
+.demo-banner.hidden {
+  display: none !important;
+}
+
+.demo-badge {
+  background: #F59E0B;
+  color: #FFFFFF;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
 /* ─── Target Site Card (Zenflow / Daybreak Yoga Floating Card Style) ─── */
 .site-card {
   position: relative;

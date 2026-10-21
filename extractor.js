@@ -1,4 +1,4 @@
-// extractor.js - v2.5 Deep Web Design Clone Engine
+// extractor.js - v2.3.0 Deep Web Design Clone Engine
 // Extracts EVERYTHING needed to replicate a website's exact visual design
 // Produces a comprehensive DESIGN.md optimized for Antigravity & AI coding assistants
 
@@ -111,26 +111,20 @@ function extractDesignSystem() {
       const idAttr = node.id ? ` id="${node.id}"` : '';
 
       if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tag)) {
-        const textPreview = cleanText(node.innerText).slice(0, 40);
-        const hint = textPreview ? ` "${textPreview}"` : '';
-        return `${indent}<${tag}${idAttr}${classAttr}>[${tag.toUpperCase()}${hint}]</${tag}>\n`;
+        return `${indent}<${tag}${idAttr}${classAttr}>[${tag.toUpperCase()} Placeholder]</${tag}>\n`;
       }
 
       if (tag === 'p') {
-        const textPreview = cleanText(node.innerText).slice(0, 35);
-        const hint = textPreview ? ` "${textPreview}..."` : '';
-        return `${indent}<p${idAttr}${classAttr}>[Paragraph${hint}]</p>\n`;
+        return `${indent}<p${idAttr}${classAttr}>[Paragraph Content Placeholder]</p>\n`;
       }
 
       if (tag === 'button' || (tag === 'a' && (classes.includes('btn') || classes.includes('button')))) {
-        const textPreview = cleanText(node.innerText).slice(0, 30);
-        const hint = textPreview ? ` "${textPreview}"` : ' CTA';
-        return `${indent}<${tag}${idAttr}${classAttr}>[Button:${hint}]</${tag}>\n`;
+        return `${indent}<${tag}${idAttr}${classAttr}>[Button CTA Placeholder]</${tag}>\n`;
       }
 
       if (tag === 'img') {
-        const w = node.offsetWidth || node.width;
-        const h = node.offsetHeight || node.height;
+        const w = node.offsetWidth || node.width || 'auto';
+        const h = node.offsetHeight || node.height || 'auto';
         return `${indent}<img${idAttr}${classAttr} src="[Image: ${w}x${h}]" alt="[Image]"/>\n`;
       }
 
@@ -148,11 +142,7 @@ function extractDesignSystem() {
 
       const children = Array.from(node.children);
       if (children.length === 0) {
-        const txt = cleanText(node.innerText);
-        if (txt && txt.length < 50) {
-          return `${indent}<${tag}${idAttr}${classAttr}>[Text: "${txt.slice(0, 30)}"]</${tag}>\n`;
-        }
-        return `${indent}<${tag}${idAttr}${classAttr}></${tag}>\n`;
+        return `${indent}<${tag}${idAttr}${classAttr}>[Content Label]</${tag}>\n`;
       }
 
       let inner = '';
@@ -181,7 +171,18 @@ function extractDesignSystem() {
       materialUI: false
     };
 
-    const allNodes = Array.from(document.querySelectorAll('*')).slice(0, 1000);
+    const frameworkNodes = [];
+    const landmarks = Array.from(document.querySelectorAll('header, nav, main, section, footer, article, aside'));
+    if (landmarks.length > 0) {
+      const perLandmark = Math.max(50, Math.floor(1500 / landmarks.length));
+      landmarks.forEach(lm => {
+        frameworkNodes.push(lm);
+        Array.from(lm.querySelectorAll('*')).slice(0, perLandmark).forEach(el => frameworkNodes.push(el));
+      });
+    } else {
+      document.querySelectorAll('body *').forEach(el => frameworkNodes.push(el));
+    }
+    const allNodes = Array.from(new Set(frameworkNodes)).slice(0, 1500);
     const tailwindRegex = /^(p[xytrbl]?-\d+|m[xytrbl]?-\d+|bg-\w+-\d+|text-\w+-\d+|flex|grid|gap-\d+|rounded-(?:sm|md|lg|xl|2xl|full)|border-\w+|shadow-(?:sm|md|lg|xl|2xl)|items-center|justify-between|w-full|h-screen|max-w-\w+)$/;
     const twClasses = new Set();
 
@@ -208,47 +209,68 @@ function extractDesignSystem() {
     return fw;
   }
 
-  // ─── Stylesheet Pseudo-Class Parser (:hover, :focus) ──────────────
+  // ─── Stylesheet Pseudo-Class Parser (:hover, :focus, with @media recursion) ───
   function extractPseudoStates() {
     const pseudoRules = {
       buttons: [],
       links: [],
-      cards: []
+      cards: [],
+      general: []
     };
+
+    function inspectRule(rule) {
+      if (!rule) return;
+
+      // Recurse into @media or @supports groupings (e.g. Tailwind v4 @media (hover: hover))
+      if (rule.cssRules && (rule instanceof CSSMediaRule || rule instanceof CSSGroupingRule)) {
+        try {
+          for (const nested of rule.cssRules) {
+            inspectRule(nested);
+          }
+        } catch (e) {}
+        return;
+      }
+
+      if (rule.selectorText && (rule.selectorText.includes(':hover') || rule.selectorText.includes(':focus'))) {
+        const sel = rule.selectorText;
+        const style = rule.style;
+        if (!style) return;
+
+        const change = {};
+        ['background', 'backgroundColor', 'color', 'borderColor', 'transform', 'boxShadow', 'opacity'].forEach(prop => {
+          const val = style.getPropertyValue(prop.replace(/([A-Z])/g, '-$1').toLowerCase());
+          if (val) change[prop] = val;
+        });
+
+        if (Object.keys(change).length > 0) {
+          const state = sel.includes(':focus') ? ':focus' : ':hover';
+          if (sel.includes('btn') || sel.includes('button')) {
+            pseudoRules.buttons.push({ selector: sel.slice(0, 80), state, change });
+          } else if (sel.includes('card') || sel.includes('tile')) {
+            pseudoRules.cards.push({ selector: sel.slice(0, 80), state, change });
+          } else if (sel.includes('a') || sel.includes('nav')) {
+            pseudoRules.links.push({ selector: sel.slice(0, 80), state, change });
+          } else {
+            pseudoRules.general.push({ selector: sel.slice(0, 80), state, change });
+          }
+        }
+      }
+    }
 
     try {
       for (const sheet of document.styleSheets) {
         try {
           for (const rule of (sheet.cssRules || [])) {
-            if (rule.selectorText && rule.selectorText.includes(':hover')) {
-              const sel = rule.selectorText;
-              const style = rule.style;
-              if (!style) continue;
-
-              const change = {};
-              ['background', 'backgroundColor', 'color', 'borderColor', 'transform', 'boxShadow', 'opacity'].forEach(prop => {
-                const val = style.getPropertyValue(prop.replace(/([A-Z])/g, '-$1').toLowerCase());
-                if (val) change[prop] = val;
-              });
-
-              if (Object.keys(change).length > 0) {
-                if (sel.includes('btn') || sel.includes('button')) {
-                  pseudoRules.buttons.push({ selector: sel.slice(0, 60), state: ':hover', change });
-                } else if (sel.includes('card') || sel.includes('tile')) {
-                  pseudoRules.cards.push({ selector: sel.slice(0, 60), state: ':hover', change });
-                } else if (sel.includes('a') || sel.includes('nav')) {
-                  pseudoRules.links.push({ selector: sel.slice(0, 60), state: ':hover', change });
-                }
-              }
-            }
+            inspectRule(rule);
           }
         } catch (e) { /* cross-origin rules ignored */ }
       }
     } catch (e) {}
 
-    pseudoRules.buttons = pseudoRules.buttons.slice(0, 5);
-    pseudoRules.cards = pseudoRules.cards.slice(0, 4);
-    pseudoRules.links = pseudoRules.links.slice(0, 4);
+    pseudoRules.buttons = pseudoRules.buttons.slice(0, 8);
+    pseudoRules.cards = pseudoRules.cards.slice(0, 8);
+    pseudoRules.links = pseudoRules.links.slice(0, 8);
+    pseudoRules.general = pseudoRules.general.slice(0, 8);
     return pseudoRules;
   }
 
@@ -415,7 +437,30 @@ function extractDesignSystem() {
   const transitionSet = new Set();
   const spacingValues = new Set();
 
-  const allElements = Array.from(document.querySelectorAll('*')).slice(0, 2500);
+  // Balanced section-aware element sampling across the entire page (Header to Footer)
+  const sampledElements = [];
+  const landmarks = Array.from(document.querySelectorAll('header, nav, main, section, footer, article, aside, [role="banner"], [role="main"], [role="contentinfo"]'));
+
+  if (landmarks.length > 0) {
+    const perLandmarkQuota = Math.max(80, Math.floor(4000 / landmarks.length));
+    landmarks.forEach(lm => {
+      sampledElements.push(lm);
+      Array.from(lm.querySelectorAll('*'))
+        .filter(el => el.offsetWidth > 0 || el.offsetHeight > 0)
+        .slice(0, perLandmarkQuota)
+        .forEach(el => sampledElements.push(el));
+    });
+  }
+
+  // Also include direct children of body / root
+  document.querySelectorAll('body > *, #root > *, #__next > *').forEach(parent => {
+    Array.from(parent.querySelectorAll('*'))
+      .filter(el => el.offsetWidth > 0 || el.offsetHeight > 0)
+      .slice(0, 150)
+      .forEach(el => sampledElements.push(el));
+  });
+
+  const allElements = Array.from(new Set(sampledElements));
 
   allElements.forEach(el => {
     if (el.offsetWidth === 0 && el.offsetHeight === 0) return;
@@ -928,43 +973,57 @@ function extractDesignSystem() {
     }
   });
 
-  // ─── 12. Synthesize Clean Semantic Design Tokens ─────────────────────
-  const isDark = result.mode === 'Dark Mode';
+  // ─── 12. Synthesize Clean Semantic Design Tokens (Measured Only) ─────
   const c = result.colors;
   const t = result.typography;
   const h1 = t.hierarchy.h1 || {};
   const h2 = t.hierarchy.h2 || {};
   const p = t.hierarchy.p || {};
 
-  result.synthesizedTokens = {
-    '--bg-primary': c.backgrounds[0]?.hex || (isDark ? '#0A0D14' : '#FFFFFF'),
-    '--bg-surface': c.backgrounds[1]?.hex || (isDark ? '#141824' : '#F8FAFC'),
-    '--bg-surface-elevated': c.backgrounds[2]?.hex || (isDark ? '#1E2436' : '#FFFFFF'),
-    '--text-primary': c.text[0]?.hex || (isDark ? '#F8FAFC' : '#0F172A'),
-    '--text-secondary': c.text[1]?.hex || (isDark ? '#94A3B8' : '#475569'),
-    '--text-muted': c.text[2]?.hex || (isDark ? '#64748B' : '#94A3B8'),
-    '--border-subtle': c.borders[0]?.hex || (isDark ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0'),
-    '--border-highlight': c.borders[1]?.hex || (isDark ? 'rgba(255, 255, 255, 0.16)' : '#CBD5E1'),
-    '--accent-primary': result.components.buttons[0]?.style?.background || (isDark ? '#6366F1' : '#4F46E5'),
-    '--accent-gradient': c.gradients[0] || 'linear-gradient(135deg, #6366F1 0%, #A855F7 100%)',
-    '--font-sans': `"${t.fontFamilies[0]?.name || 'Inter'}", -apple-system, BlinkMacSystemFont, sans-serif`,
-    '--font-size-h1': h1.fontSize || '56px',
-    '--font-weight-h1': h1.fontWeight || '800',
-    '--letter-spacing-h1': h1.letterSpacing || '-0.025em',
-    '--font-size-h2': h2.fontSize || '36px',
-    '--font-weight-h2': h2.fontWeight || '700',
-    '--font-size-body': p.fontSize || '16px',
-    '--line-height-body': p.lineHeight || '1.6',
-    '--radius-sm': result.radii[0] || '6px',
-    '--radius-md': result.radii[1] || '12px',
-    '--radius-lg': result.radii[2] || '20px',
-    '--radius-pill': '9999px',
-    '--shadow-card': result.shadows[0] || (isDark ? '0 4px 24px rgba(0, 0, 0, 0.4)' : '0 4px 20px rgba(0, 0, 0, 0.06)'),
-    '--shadow-elevated': result.shadows[1] || (isDark ? '0 12px 40px rgba(0, 0, 0, 0.6)' : '0 12px 32px rgba(0, 0, 0, 0.1)'),
-    '--container-max-width': result.layout.containerMaxWidth || '1200px',
-    '--backdrop-blur': result.blurEffects[0] || 'blur(16px)',
-    '--transition-smooth': result.animations.transitions[0] || 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-  };
+  const tokens = {};
+  if (c.backgrounds[0]?.hex) tokens['--bg-primary'] = c.backgrounds[0].hex;
+  else if (bodyBg) tokens['--bg-primary'] = bodyBg;
+
+  if (c.backgrounds[1]?.hex) tokens['--bg-surface'] = c.backgrounds[1].hex;
+  if (c.backgrounds[2]?.hex) tokens['--bg-surface-elevated'] = c.backgrounds[2].hex;
+
+  if (c.text[0]?.hex) tokens['--text-primary'] = c.text[0].hex;
+  if (c.text[1]?.hex) tokens['--text-secondary'] = c.text[1].hex;
+  if (c.text[2]?.hex) tokens['--text-muted'] = c.text[2].hex;
+
+  if (c.borders[0]?.hex) tokens['--border-subtle'] = c.borders[0].hex;
+  if (c.borders[1]?.hex) tokens['--border-highlight'] = c.borders[1].hex;
+
+  const btnBg = result.components.buttons[0]?.style?.background;
+  if (btnBg) tokens['--accent-primary'] = btnBg;
+  else if (c.accents[0]) tokens['--accent-primary'] = c.accents[0];
+
+  if (c.gradients[0]) tokens['--accent-gradient'] = c.gradients[0];
+
+  if (t.fontFamilies[0]?.name) {
+    tokens['--font-sans'] = `"${t.fontFamilies[0].name}", -apple-system, BlinkMacSystemFont, sans-serif`;
+  }
+  if (h1.fontSize) tokens['--font-size-h1'] = h1.fontSize;
+  if (h1.fontWeight) tokens['--font-weight-h1'] = h1.fontWeight;
+  if (h1.letterSpacing) tokens['--letter-spacing-h1'] = h1.letterSpacing;
+  if (h2.fontSize) tokens['--font-size-h2'] = h2.fontSize;
+  if (h2.fontWeight) tokens['--font-weight-h2'] = h2.fontWeight;
+  if (p.fontSize) tokens['--font-size-body'] = p.fontSize;
+  if (p.lineHeight) tokens['--line-height-body'] = p.lineHeight;
+
+  if (result.radii[0]) tokens['--radius-sm'] = result.radii[0];
+  if (result.radii[1]) tokens['--radius-md'] = result.radii[1];
+  if (result.radii[2]) tokens['--radius-lg'] = result.radii[2];
+  if (result.radii.length > 0) tokens['--radius-pill'] = '9999px';
+
+  if (result.shadows[0]) tokens['--shadow-card'] = result.shadows[0];
+  if (result.shadows[1]) tokens['--shadow-elevated'] = result.shadows[1];
+
+  if (result.layout.containerMaxWidth) tokens['--container-max-width'] = result.layout.containerMaxWidth;
+  if (result.blurEffects[0]) tokens['--backdrop-blur'] = result.blurEffects[0];
+  if (result.animations.transitions[0]) tokens['--transition-smooth'] = result.animations.transitions[0];
+
+  result.synthesizedTokens = tokens;
 
   return result;
 }
@@ -990,65 +1049,36 @@ function generateDesignTokensMD(data) {
   md += `> **Role:** Master Design System file (\`DESIGN.md\`) to apply this exact visual aesthetic to any tool or website.  \n\n`;
   md += `---\n\n`;
 
-  // 1. Dynamic Architectural Directives (Extracted from live DOM)
-  md += `## 1. 🛡️ Architectural & Visual Quality Directives\n\n`;
-  md += `> **ATTENTION AI CODING AGENT:** When building or styling code for this project, you MUST adhere strictly to the actual design tokens and visual architecture extracted from **${m.domain}**. Do NOT revert to standard, unstyled, or generic AI templates.\n\n`;
-  md += `- 🎯 **Color Palette Fidelity:** Use ONLY the exact HSL/Hex palette defined in this document (\`var(--bg-primary)\`, \`var(--bg-surface)\`, \`var(--text-primary)\`). Do not invent saturated default blues or grays.\n`;
-  md += `- 🎯 **Typography Tracking:** Headings MUST use tightened letter-spacing (\`${tok['--letter-spacing-h1'] || '-0.025em'}\`) and bold weights (\`${tok['--font-weight-h1'] || '700/800'}\`). Un-tracked headings look amateur.\n`;
+  // 1. Measured Architectural Directives
+  md += `## 1. Measured Architectural Directives\n\n`;
+  md += `> The following visual properties were measured directly from elements across **${m.domain}**:\n\n`;
+  md += `- **Color Palette:** Synthesized palette extracted from live element computed styles (\`var(--bg-primary)\`, \`var(--bg-surface)\`, \`var(--text-primary)\`).\n`;
+  if (tok['--letter-spacing-h1']) {
+    md += `- **Typography Tracking:** Headings use \`letter-spacing: ${tok['--letter-spacing-h1']}\` with \`font-weight: ${tok['--font-weight-h1'] || '700'}\`.\n`;
+  }
   if (data.framework?.tailwind) {
-    md += `- 🎯 **Framework Detected:** \`Tailwind CSS\` detected (${data.framework.tailwindClassCount} utilities). You may use Tailwind utility classes corresponding to the design tokens below.\n`;
+    md += `- **CSS Framework:** \`Tailwind CSS\` detected (${data.framework.tailwindClassCount} utilities identified).\n`;
   }
   if (data.radii.length > 0) {
-    md += `- 🎯 **Border Radius System:** Follow the extracted scale: Cards (\`${tok['--radius-md'] || '12px'}\`), Buttons (\`${tok['--radius-sm'] || '6px'}\`).\n`;
+    md += `- **Border Radii:** Card radius (\`${tok['--radius-md'] || 'none'}\`), Button radius (\`${tok['--radius-sm'] || 'none'}\`).\n`;
   }
   if (tok['--backdrop-blur']) {
-    md += `- 🎯 **Glassmorphism:** Apply \`backdrop-filter: ${tok['--backdrop-blur']}\` to elevated cards and navigation bars.\n`;
+    md += `- **Backdrop Filter:** Measured blur \`${tok['--backdrop-blur']}\`.\n`;
   }
-  md += `- 🎯 **Micro-Interactions:** Interactive elements MUST have transitions (\`${tok['--transition-smooth'] || 'all 0.2s ease'}\`) matching the pseudo-states documented below.\n\n`;
+  if (tok['--transition-smooth']) {
+    md += `- **Transitions:** Standard transitions measured at \`${tok['--transition-smooth']}\`.\n\n`;
+  }
 
   // 2. Master CSS Design Tokens (:root block)
   md += `## 2. 🎨 Master CSS Design Tokens (\`:root\` Variables)\n\n`;
-  md += `> Drop this complete block into your root CSS file (\`index.css\` or \`globals.css\`). All components should reference these variables.\n\n`;
+  md += `> Drop this complete block into your root CSS file (\`index.css\` or \`globals.css\`). Only measured properties from the target page are included.\n\n`;
   md += `\`\`\`css\n`;
   md += `:root {\n`;
-  md += `  /* ── Background & Surface Palette ── */\n`;
-  md += `  --bg-primary: ${tok['--bg-primary']};\n`;
-  md += `  --bg-surface: ${tok['--bg-surface']};\n`;
-  md += `  --bg-surface-elevated: ${tok['--bg-surface-elevated']};\n`;
-  md += `\n`;
-  md += `  /* ── Typography & Text Colors ── */\n`;
-  md += `  --text-primary: ${tok['--text-primary']};\n`;
-  md += `  --text-secondary: ${tok['--text-secondary']};\n`;
-  md += `  --text-muted: ${tok['--text-muted']};\n`;
-  md += `\n`;
-  md += `  /* ── Borders & Highlights ── */\n`;
-  md += `  --border-subtle: ${tok['--border-subtle']};\n`;
-  md += `  --border-highlight: ${tok['--border-highlight']};\n`;
-  md += `\n`;
-  md += `  /* ── Brand Accents & Gradients ── */\n`;
-  md += `  --accent-primary: ${tok['--accent-primary']};\n`;
-  md += `  --accent-gradient: ${tok['--accent-gradient']};\n`;
-  md += `\n`;
-  md += `  /* ── Typography Scale & Weights ── */\n`;
-  md += `  --font-sans: ${tok['--font-sans']};\n`;
-  md += `  --font-size-h1: ${tok['--font-size-h1']};\n`;
-  md += `  --font-weight-h1: ${tok['--font-weight-h1']};\n`;
-  md += `  --letter-spacing-h1: ${tok['--letter-spacing-h1']};\n`;
-  md += `  --font-size-h2: ${tok['--font-size-h2']};\n`;
-  md += `  --font-weight-h2: ${tok['--font-weight-h2']};\n`;
-  md += `  --font-size-body: ${tok['--font-size-body']};\n`;
-  md += `  --line-height-body: ${tok['--line-height-body']};\n`;
-  md += `\n`;
-  md += `  /* ── Shape, Spacing & Elevation ── */\n`;
-  md += `  --radius-sm: ${tok['--radius-sm']};\n`;
-  md += `  --radius-md: ${tok['--radius-md']};\n`;
-  md += `  --radius-lg: ${tok['--radius-lg']};\n`;
-  md += `  --radius-pill: ${tok['--radius-pill']};\n`;
-  md += `  --shadow-card: ${tok['--shadow-card']};\n`;
-  md += `  --shadow-elevated: ${tok['--shadow-elevated']};\n`;
-  md += `  --container-max-width: ${tok['--container-max-width']};\n`;
-  md += `  --backdrop-blur: ${tok['--backdrop-blur']};\n`;
-  md += `  --transition-smooth: ${tok['--transition-smooth']};\n`;
+  for (const [prop, val] of Object.entries(tok)) {
+    if (val) {
+      md += `  ${prop}: ${val};\n`;
+    }
+  }
   md += `}\n`;
   md += `\`\`\`\n\n`;
 
@@ -1128,41 +1158,35 @@ function generateDesignTokensMD(data) {
   }
   md += `\n`;
 
-  // 6. Component Styling Tokens
-  md += `## 6. Component Styling Tokens (Buttons, Cards, Badges)\n\n`;
-  md += `### Button Styles\n\`\`\`css\n`;
-  md += `.btn {\n`;
-  md += `  display: inline-flex; align-items: center; justify-content: center; gap: 8px;\n`;
-  md += `  padding: ${comp.buttons[0]?.style?.padding || '12px 22px'};\n`;
-  md += `  border-radius: var(--radius-sm); font-family: var(--font-sans);\n`;
-  md += `  font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer;\n`;
-  md += `  transition: var(--transition-smooth);\n`;
-  md += `}\n`;
-  md += `.btn-primary {\n`;
-  md += `  background: var(--accent-primary); color: #FFFFFF; border: none;\n`;
-  md += `  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);\n`;
-  md += `}\n`;
-  md += `.btn-primary:hover {\n`;
-  md += `  opacity: 0.92; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);\n`;
-  md += `}\n`;
-  md += `.btn-outline {\n`;
-  md += `  background: transparent; color: var(--text-primary); border: 1px solid var(--border-subtle);\n`;
-  md += `}\n`;
-  md += `.btn-outline:hover {\n`;
-  md += `  background: var(--bg-surface); border-color: var(--border-highlight);\n`;
-  md += `}\n`;
-  md += `\`\`\`\n\n`;
+  // 6. Component Styling Tokens (Measured Directly from Elements)
+  md += `## 6. Component Styling Tokens (Measured Directly from Elements)\n\n`;
+  if (comp.buttons.length > 0) {
+    md += `### Measured Button Styles\n`;
+    comp.buttons.slice(0, 4).forEach((btn, idx) => {
+      md += `**Button Variant ${idx + 1} (${btn.tag}):**\n\`\`\`css\n`;
+      Object.entries(btn.style).forEach(([k, v]) => {
+        const cssProp = k.replace(/([A-Z])/g, '-$1').toLowerCase();
+        md += `${cssProp}: ${v};\n`;
+      });
+      md += `\`\`\`\n\n`;
+    });
+  } else {
+    md += `*No button styles detected on page.*\n\n`;
+  }
 
-  md += `### Card Styles\n\`\`\`css\n`;
-  md += `.card {\n`;
-  md += `  background: var(--bg-surface); border: 1px solid var(--border-subtle);\n`;
-  md += `  border-radius: var(--radius-md); padding: 28px; box-shadow: var(--shadow-card);\n`;
-  md += `  display: flex; flex-direction: column; gap: 14px; transition: var(--transition-smooth);\n`;
-  md += `}\n`;
-  md += `.card:hover {\n`;
-  md += `  border-color: var(--border-highlight); box-shadow: var(--shadow-elevated); transform: translateY(-2px);\n`;
-  md += `}\n`;
-  md += `\`\`\`\n\n`;
+  if (comp.cards.length > 0) {
+    md += `### Measured Card / Container Styles\n`;
+    comp.cards.slice(0, 4).forEach((card, idx) => {
+      md += `**Container Variant ${idx + 1} (${card.innerStructure}):**\n\`\`\`css\n`;
+      Object.entries(card.style).forEach(([k, v]) => {
+        const cssProp = k.replace(/([A-Z])/g, '-$1').toLowerCase();
+        md += `${cssProp}: ${v};\n`;
+      });
+      md += `\`\`\`\n\n`;
+    });
+  } else {
+    md += `*No card containers detected on page.*\n\n`;
+  }
 
   // 7. Animations
   md += `## 7. Animations & Micro-Interactions\n\n`;
@@ -1190,30 +1214,24 @@ function generateDesignTokensMD(data) {
   md += `Do NOT use generic or default styles. Adhere strictly to the design tokens and rules below:\n\n`;
   md += `DESIGN TOKENS:\n`;
   md += `- Visual Mode: ${data.mode}\n`;
-  md += `- Canvas Background: ${tok['--bg-primary'] || c.backgrounds[0]?.hex}\n`;
-  md += `- Surface/Card Background: ${tok['--bg-surface'] || c.backgrounds[1]?.hex}\n`;
-  md += `- Elevated Background: ${tok['--bg-surface-elevated'] || c.backgrounds[2]?.hex || '#1E2436'}\n`;
-  md += `- Primary Text: ${tok['--text-primary'] || c.text[0]?.hex}\n`;
-  md += `- Secondary/Muted Text: ${tok['--text-secondary'] || c.text[1]?.hex}\n`;
-  md += `- Subtle Border: ${tok['--border-subtle']}\n`;
-  md += `- Highlight Border: ${tok['--border-highlight']}\n`;
-  md += `- Primary Accent: ${tok['--accent-primary']}\n`;
-  md += `- Accent Gradient: ${tok['--accent-gradient']}\n`;
-  md += `- Font Family: ${tok['--font-sans']}\n`;
-  md += `- Heading 1: ${tok['--font-size-h1']}, weight ${tok['--font-weight-h1']}, tracking ${tok['--letter-spacing-h1']}\n`;
-  md += `- Heading 2: ${tok['--font-size-h2']}, weight ${tok['--font-weight-h2']}\n`;
-  md += `- Body: ${tok['--font-size-body']}, line-height ${tok['--line-height-body']}\n`;
-  md += `- Border Radius: Cards (${tok['--radius-md']}), Buttons (${tok['--radius-sm']}), Pills (${tok['--radius-pill']})\n`;
-  md += `- Elevation Shadow: ${tok['--shadow-card']}\n`;
-  md += `- Max Container Width: ${tok['--container-max-width']}\n`;
-  if (data.blurEffects.length > 0) md += `- Glassmorphism: backdrop-filter: ${data.blurEffects[0]}\n`;
-  md += `- Smooth Transitions: ${tok['--transition-smooth']}\n`;
-  md += `\n`;
-  md += `QUALITY RULES:\n`;
-  md += `1. Add subtle 1px border highlights to all cards.\n`;
-  md += `2. Add hover micro-interactions (translateY(-2px) + shadow) to all cards and buttons.\n`;
-  md += `3. Tighten letter-spacing on headings for modern polish.\n`;
-  md += `4. Ensure generous padding on all sections.\n`;
+  if (tok['--bg-primary']) md += `- Canvas Background: ${tok['--bg-primary']}\n`;
+  if (tok['--bg-surface']) md += `- Surface/Card Background: ${tok['--bg-surface']}\n`;
+  if (tok['--bg-surface-elevated']) md += `- Elevated Background: ${tok['--bg-surface-elevated']}\n`;
+  if (tok['--text-primary']) md += `- Primary Text: ${tok['--text-primary']}\n`;
+  if (tok['--text-secondary']) md += `- Secondary/Muted Text: ${tok['--text-secondary']}\n`;
+  if (tok['--border-subtle']) md += `- Subtle Border: ${tok['--border-subtle']}\n`;
+  if (tok['--border-highlight']) md += `- Highlight Border: ${tok['--border-highlight']}\n`;
+  if (tok['--accent-primary']) md += `- Primary Accent: ${tok['--accent-primary']}\n`;
+  if (tok['--accent-gradient']) md += `- Accent Gradient: ${tok['--accent-gradient']}\n`;
+  if (tok['--font-sans']) md += `- Font Family: ${tok['--font-sans']}\n`;
+  if (tok['--font-size-h1']) md += `- Heading 1: ${tok['--font-size-h1']}, weight ${tok['--font-weight-h1'] || 'bold'}${tok['--letter-spacing-h1'] ? `, tracking ${tok['--letter-spacing-h1']}` : ''}\n`;
+  if (tok['--font-size-h2']) md += `- Heading 2: ${tok['--font-size-h2']}, weight ${tok['--font-weight-h2'] || 'bold'}\n`;
+  if (tok['--font-size-body']) md += `- Body: ${tok['--font-size-body']}${tok['--line-height-body'] ? `, line-height ${tok['--line-height-body']}` : ''}\n`;
+  if (tok['--radius-md'] || tok['--radius-sm']) md += `- Border Radius: Cards (${tok['--radius-md'] || 'none'}), Buttons (${tok['--radius-sm'] || 'none'})\n`;
+  if (tok['--shadow-card']) md += `- Elevation Shadow: ${tok['--shadow-card']}\n`;
+  if (tok['--container-max-width']) md += `- Max Container Width: ${tok['--container-max-width']}\n`;
+  if (tok['--backdrop-blur']) md += `- Backdrop Filter: ${tok['--backdrop-blur']}\n`;
+  if (tok['--transition-smooth']) md += `- Transitions: ${tok['--transition-smooth']}\n`;
   md += `\`\`\`\n`;
 
   return md;
@@ -1293,95 +1311,15 @@ function generateUILayoutMD(data) {
     md += `\n`;
   });
 
-  // 3. Ready-to-Use Component Code Starters
-  md += `## 3. 🛠️ Ready-to-Use UI Component Code Starters\n\n`;
-
-  // Navbar
-  md += `### 3.1 Navigation Bar Component\n\n`;
-  md += `\`\`\`html\n`;
-  md += `<nav class="navbar">\n`;
-  md += `  <div class="navbar-container">\n`;
-  md += `    <a href="#" class="navbar-logo"><span>BrandLogo</span></a>\n`;
-  md += `    <div class="navbar-links">\n`;
-  if (comp.navbar?.navLinks?.length > 0) {
-    comp.navbar.navLinks.slice(0, 5).forEach(l => {
-      md += `      <a href="#" class="nav-link">${l.text || 'Link'}</a>\n`;
-    });
-  } else {
-    md += `      <a href="#" class="nav-link">Features</a>\n`;
-    md += `      <a href="#" class="nav-link">Solutions</a>\n`;
-    md += `      <a href="#" class="nav-link">Pricing</a>\n`;
-  }
-  md += `    </div>\n`;
-  md += `    <div class="navbar-actions">\n`;
-  md += `      <button class="btn btn-primary">${comp.navbar?.ctaText || 'Get Started'}</button>\n`;
-  md += `    </div>\n`;
-  md += `  </div>\n`;
-  md += `</nav>\n`;
-  md += `\`\`\`\n\n`;
-
-  md += `\`\`\`css\n`;
-  md += `.navbar {\n`;
-  md += `  position: sticky; top: 0; z-index: 100; width: 100%;\n`;
-  md += `  background: ${comp.navbar?.style?.background || 'rgba(10, 13, 20, 0.8)'};\n`;
-  md += `  backdrop-filter: var(--backdrop-blur); -webkit-backdrop-filter: var(--backdrop-blur);\n`;
-  md += `  border-bottom: 1px solid var(--border-subtle);\n`;
-  md += `}\n`;
-  md += `.navbar-container {\n`;
-  md += `  max-width: var(--container-max-width); margin: 0 auto; padding: 0 24px;\n`;
-  md += `  height: ${comp.navbar?.dimensions?.height || 64}px; display: flex; align-items: center; justify-content: space-between;\n`;
-  md += `}\n`;
-  md += `.navbar-logo { font-size: 18px; font-weight: 700; color: var(--text-primary); text-decoration: none; }\n`;
-  md += `.navbar-links { display: flex; align-items: center; gap: 28px; }\n`;
-  md += `.nav-link { font-size: 14px; font-weight: 500; color: var(--text-secondary); text-decoration: none; transition: var(--transition-smooth); }\n`;
-  md += `.nav-link:hover { color: var(--text-primary); }\n`;
-  md += `\`\`\`\n\n`;
-
-  // Hero Section
-  md += `### 3.2 Hero Section Component\n\n`;
-  md += `\`\`\`html\n`;
-  md += `<section class="hero-section">\n`;
-  md += `  <div class="hero-container">\n`;
-  md += `    <div class="hero-badge"><span class="badge-dot"></span><span>New Release &rarr;</span></div>\n`;
-  md += `    <h1 class="hero-title">${comp.hero?.headline?.text || 'Build the Future of Modern Software'}</h1>\n`;
-  md += `    <p class="hero-subtitle">${comp.hero?.subheadline?.text || 'Powerful, scalable, and intuitive tooling designed to accelerate engineering velocity.'}</p>\n`;
-  md += `    <div class="hero-cta-group">\n`;
-  md += `      <button class="btn btn-primary">${comp.hero?.buttons[0]?.text || 'Get Started'}</button>\n`;
-  md += `      <button class="btn btn-outline">${comp.hero?.buttons[1]?.text || 'Book a Demo'}</button>\n`;
-  md += `    </div>\n`;
-  md += `  </div>\n`;
-  md += `</section>\n`;
-  md += `\`\`\`\n\n`;
-
-  // Bento Feature Card
-  md += `### 3.3 Bento / Feature Card Component\n\n`;
-  md += `\`\`\`html\n`;
-  md += `<div class="card">\n`;
-  md += `  <div class="card-icon-wrapper">\n`;
-  md += `    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">\n`;
-  md += `      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>\n`;
-  md += `    </svg>\n`;
-  md += `  </div>\n`;
-  md += `  <h3 class="card-title">Lightning Performance</h3>\n`;
-  md += `  <p class="card-description">Architected for instantaneous responses and ultra-low latency worldwide.</p>\n`;
-  md += `</div>\n`;
-  md += `\`\`\`\n\n`;
-
-  // Footer
-  md += `### 3.4 Footer Component\n\n`;
-  md += `\`\`\`html\n`;
-  md += `<footer class="footer">\n`;
-  md += `  <div class="footer-container">\n`;
-  md += `    <div class="footer-brand">\n`;
-  md += `      <h3>BrandLogo</h3>\n`;
-  md += `      <p>Building high-performance software for high-velocity teams.</p>\n`;
-  md += `    </div>\n`;
-  md += `    <div class="footer-bottom">\n`;
-  md += `      <span>&copy; ${new Date().getFullYear()} ${m.domain}. All rights reserved.</span>\n`;
-  md += `    </div>\n`;
-  md += `  </div>\n`;
-  md += `</footer>\n`;
-  md += `\`\`\`\n\n`;
+  // 3. Section Wireframe Blueprint Summary
+  md += `## 3. Measured Section Wireframe Summary\n\n`;
+  data.sections.slice(0, 6).forEach((sec, idx) => {
+    md += `### 3.${idx + 1} ${sec.type} Blueprint\n`;
+    md += `- **Container:** \`<${sec.tag}>\` (Layout: \`${sec.layout.type || 'block'}\`, Height: \`${sec.position.height}px\`)\n`;
+    if (sec.domSkeleton) {
+      md += `\`\`\`html\n${sec.domSkeleton.split('\n').slice(0, 18).join('\n')}\n\`\`\`\n\n`;
+    }
+  });
 
   // 4. Responsive Breakpoints
   md += `## 4. Responsive Breakpoints & Layout Container\n\n`;

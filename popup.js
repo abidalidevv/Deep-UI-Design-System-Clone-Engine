@@ -1,5 +1,5 @@
-// popup.js v3.2 - Fully Functional Enterprise Controller for Design2MD Pro
-// Supports dual-mode: Dynamic Live DOM Extraction on any website + Self-Hydrating Interactive Demo
+// popup.js v2.3.0 - Controller for Design2MD Pro
+// Supports dynamic live DOM extraction on any website + explicit error states (no silent demo fallback)
 
 let extractedData = null;
 let designMarkdown = '';
@@ -7,15 +7,94 @@ let uiMarkdown = '';
 let fullMarkdown = '';
 let activePreviewDoc = 'design';
 
+function showExtractionError(message) {
+  document.getElementById('statusText').textContent = 'ERROR';
+  const badge = document.getElementById('statusBadge');
+  if (badge) {
+    badge.style.borderColor = '#FCA5A5';
+    badge.style.background = '#FEF2F2';
+    badge.style.color = '#DC2626';
+  }
+  document.getElementById('siteDomain').textContent = 'Extraction Blocked / Failed';
+  document.getElementById('siteTitle').textContent = message || 'Could not access DOM on this page';
+  const pill = document.getElementById('themePill');
+  if (pill) {
+    pill.textContent = 'Unavailable';
+    pill.style.background = '#F3F4F6';
+    pill.style.color = '#9CA3AF';
+  }
+
+  // Explicitly disable all export buttons on error
+  const exportBtnIds = [
+    'downloadDesignBtn', 'copyTokensBtn', 'downloadUiBtn', 'copySectionsBtn',
+    'copyPromptBtn', 'downloadFullMdBtn', 'copyActivePreviewBtn',
+    'captureScreenshotBtn', 'downloadZipBundleBtn'
+  ];
+  exportBtnIds.forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.disabled = true;
+      btn.style.opacity = '0.4';
+      btn.style.cursor = 'not-allowed';
+    }
+  });
+
+  const previewEl = document.getElementById('previewCode');
+  if (previewEl) {
+    previewEl.textContent = `// Extraction Error:\n// ${message}\n// Please navigate to a live website (http:// or https://) and re-open the extension.`;
+  }
+}
+
+function loadStandaloneDemo() {
+  const banner = document.getElementById('demoBanner');
+  if (banner) banner.classList.remove('hidden');
+
+  document.getElementById('statusText').textContent = 'DEMO';
+  const badge = document.getElementById('statusBadge');
+  if (badge) {
+    badge.style.borderColor = '#FCD34D';
+    badge.style.background = '#FFFBEB';
+    badge.style.color = '#B45309';
+  }
+  document.getElementById('siteDomain').textContent = 'standalone_preview.local';
+  document.getElementById('siteTitle').textContent = 'Demo Mode (Open on live website to extract real DOM)';
+  const pill = document.getElementById('themePill');
+  if (pill) {
+    pill.textContent = 'Preview Only';
+    pill.style.background = '#FEF3C7';
+    pill.style.color = '#92400E';
+  }
+
+  // Explicitly disable all export buttons in demo mode so fake data is never exported
+  const exportBtnIds = [
+    'downloadDesignBtn', 'copyTokensBtn', 'downloadUiBtn', 'copySectionsBtn',
+    'copyPromptBtn', 'downloadFullMdBtn', 'copyActivePreviewBtn',
+    'captureScreenshotBtn', 'downloadZipBundleBtn'
+  ];
+  exportBtnIds.forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.disabled = true;
+      btn.style.opacity = '0.4';
+      btn.style.cursor = 'not-allowed';
+      btn.title = 'Exports disabled in Demo Preview Mode';
+    }
+  });
+
+  const previewEl = document.getElementById('previewCode');
+  if (previewEl) {
+    previewEl.textContent = `/* DEMO PREVIEW ONLY */\n/* Install extension in chrome://extensions and run on a live site to extract real design tokens and specs. */`;
+  }
+}
+
 async function initPopup() {
   initEventListeners();
 
-  // Check if running inside actual Chrome Extension context with activeTab access
   const isExtensionEnv = typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.query;
 
   if (!isExtensionEnv) {
-    // Standalone Browser Preview Mode: Hydrate with rich Stripe Enterprise demo dataset
-    loadDemoData();
+    // Standalone Browser Preview Mode: Show prominent demo banner and make read-only
+    loadStandaloneDemo();
     return;
   }
 
@@ -24,44 +103,30 @@ async function initPopup() {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
     tab = tabs && tabs[0];
   } catch (e) {
-    console.warn('Tab query failed, falling back to demo mode:', e);
+    showExtractionError('Could not query active tab: ' + e.message);
+    return;
   }
 
-  // If local file:/// or chrome:// page, hydrate with interactive Stripe demo
-  if (!tab || !tab.id || tab.url?.startsWith('chrome://') || tab.url?.startsWith('edge://') || tab.url?.startsWith('about:') || tab.url?.startsWith('file://')) {
-    loadDemoData();
+  if (!tab || !tab.id) {
+    showExtractionError('No active browser tab found.');
+    return;
+  }
+
+  // System pages restriction: show explicit error, never silent demo
+  if (tab.url?.startsWith('chrome://') || tab.url?.startsWith('edge://') || tab.url?.startsWith('about:') || tab.url?.startsWith('file://')) {
+    const scheme = tab.url.split(':')[0];
+    showExtractionError(`Browser security prevents extensions from running on ${scheme}:// pages. Please open a normal HTTP or HTTPS website.`);
     return;
   }
 
   try {
-    // 0. Progressive hydration sweep to mount lazy animations, IntersectionObservers, and SPAs
-    try {
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: async () => {
-          const orig = window.scrollY;
-          const totalH = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
-          const vh = window.innerHeight || 800;
-          const steps = Math.min(10, Math.max(4, Math.ceil(totalH / vh)));
-          for (let i = 1; i <= steps; i++) {
-            const y = Math.min(totalH, (i / steps) * totalH);
-            window.scrollTo({ top: y, behavior: 'instant' });
-            await new Promise(r => setTimeout(r, 120));
-          }
-          await new Promise(r => setTimeout(r, 180));
-          window.scrollTo({ top: orig, behavior: 'instant' });
-          await new Promise(r => setTimeout(r, 100));
-        }
-      });
-    } catch (e) {}
-
-    // 1. Inject extraction engine
+    // 1. Inject extraction engine directly onto untouched live page
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       files: ['extractor.js']
     });
 
-    // 2. Run extraction and generate all 3 modular markdown documents
+    // 2. Extract DOM tokens & layouts BEFORE any hydration styles touch the page
     const [execResult] = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       func: () => {
@@ -82,10 +147,12 @@ async function initPopup() {
       renderUI(extractedData);
       updatePreviewDisplay();
       document.getElementById('statusText').textContent = 'READY';
+    } else {
+      showExtractionError('Extraction returned empty data from the page.');
     }
   } catch (err) {
     console.error('Design2MD extraction error:', err);
-    loadDemoData();
+    showExtractionError(err.message || 'Script injection failed on this page.');
   }
 }
 
@@ -657,77 +724,186 @@ function downloadBlob(blob, filename) {
   showToast(`Downloaded ${filename}!`);
 }
 
-async function captureFullPageScreenshot(tab) {
-  setCaptureProgress(5, 'Analyzing page geometry...');
-
-  // 1. Measure dimensions in target tab
-  const [infoResult] = await chrome.scripting.executeScript({
-    target: { tabId: tab.id },
-    func: () => {
-      const origScrollY = window.scrollY;
-      const origScrollX = window.scrollX;
-      const body = document.body;
-      const html = document.documentElement;
-
-      const totalHeight = Math.max(
-        body.scrollHeight, html.scrollHeight,
-        body.offsetHeight, html.offsetHeight,
-        body.clientHeight, html.clientHeight
-      );
-      const totalWidth = Math.max(
-        body.scrollWidth, html.scrollWidth,
-        window.innerWidth
-      );
-      const viewportHeight = window.innerHeight;
-      const viewportWidth = window.innerWidth;
-      const dpr = window.devicePixelRatio || 1;
-
-      return {
-        totalHeight,
-        totalWidth,
-        viewportHeight,
-        viewportWidth,
-        dpr,
-        origScrollX,
-        origScrollY
-      };
-    }
-  });
-
-  if (!infoResult || !infoResult.result) {
-    throw new Error('Could not calculate page dimensions');
+// ─── Background Service Worker Throttled Capture Helper ───
+async function requestTabCapture(tab) {
+  try {
+    const res = await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({ action: 'CAPTURE_TAB', windowId: tab.windowId }, (response) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else if (response && response.error) {
+          reject(new Error(response.error));
+        } else if (response && response.dataUrl) {
+          resolve(response.dataUrl);
+        } else {
+          reject(new Error('Empty capture returned'));
+        }
+      });
+    });
+    return res;
+  } catch (bgErr) {
+    // Fallback: direct capture with 650ms minimum interval
+    await new Promise(r => setTimeout(r, 650));
+    return new Promise((resolve, reject) => {
+      chrome.tabs.captureVisibleTab(null, { format: 'png' }, (dataUrl) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else if (!dataUrl) {
+          reject(new Error('Direct capture failed'));
+        } else {
+          resolve(dataUrl);
+        }
+      });
+    });
   }
+}
 
-  const {
-    totalHeight,
-    totalWidth,
-    viewportHeight,
-    viewportWidth,
-    dpr,
-    origScrollX,
-    origScrollY
-  } = infoResult.result;
-
-  const numSteps = Math.max(1, Math.ceil(totalHeight / viewportHeight));
-  const rawChunks = [];
+// ─── Reversible Deep Page Hydration Pass ───
+async function performDeepPageHydration(tabId, onProgress) {
+  if (onProgress) onProgress(10, 'Deep hydrating lazy assets & animations...');
 
   try {
-    for (let step = 0; step < numSteps; step++) {
-      const scrollY = (step === numSteps - 1 && numSteps > 1)
-        ? Math.max(0, totalHeight - viewportHeight)
-        : step * viewportHeight;
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: async () => {
+        const initialScrollY = window.scrollY;
+        const initialScrollX = window.scrollX;
 
-      setCaptureProgress(
-        Math.round((step / numSteps) * 75) + 5,
-        `Capturing crisp slice ${step + 1} of ${numSteps}...`
-      );
+        // 1. Inject temporary hydration style (will be removed in finally)
+        let animStyle = document.getElementById('__design2md_hydration_style');
+        if (!animStyle) {
+          animStyle = document.createElement('style');
+          animStyle.id = '__design2md_hydration_style';
+          animStyle.textContent = `
+            [data-aos], .aos-init, [data-scroll], [data-reveal], .reveal, .fade-in, .animate-on-scroll {
+              opacity: 1 !important;
+              visibility: visible !important;
+              transform: none !important;
+              animation: none !important;
+              transition: none !important;
+            }
+            img, picture, svg, video {
+              opacity: 1 !important;
+              visibility: visible !important;
+            }
+          `;
+          document.head.appendChild(animStyle);
+        }
 
-      // Scroll and hide sticky header on chunks > 0
-      await chrome.scripting.executeScript({
+        // 2. Unmask inline opacity:0 and visibility:hidden styles
+        document.querySelectorAll('*').forEach(el => {
+          if (el.style && el.style.opacity === '0') el.style.opacity = '1';
+          if (el.style && el.style.visibility === 'hidden') el.style.visibility = 'visible';
+        });
+
+        // 3. Promote lazy images even if placeholder src exists
+        document.querySelectorAll('img, picture source, iframe').forEach(el => {
+          if (el.hasAttribute('loading')) el.setAttribute('loading', 'eager');
+          const dSrc = el.dataset.src || el.dataset.lazySrc || el.dataset.original;
+          if (dSrc) {
+            if (!el.src || el.src.startsWith('data:') || el.src.includes('blank') || el.src.includes('placeholder') || el.src !== dSrc) {
+              el.src = dSrc;
+            }
+          }
+          const dSrcset = el.dataset.srcset || el.dataset.lazySrcset;
+          if (dSrcset && (!el.srcset || el.srcset !== dSrcset)) {
+            el.srcset = dSrcset;
+          }
+        });
+
+        // 4. Progressive sweep: step = 0.8 * viewportHeight, NO artificial step cap
+        const vh = window.innerHeight || 800;
+        const stepSize = Math.max(300, Math.round(0.8 * vh));
+        let curY = 0;
+
+        while (curY < Math.max(document.body.scrollHeight, document.documentElement.scrollHeight)) {
+          curY += stepSize;
+          window.scrollTo({ top: curY, behavior: 'instant' });
+          window.dispatchEvent(new Event('scroll'));
+          await new Promise(r => setTimeout(r, 75));
+        }
+
+        // 5. Await web fonts
+        if (document.fonts && document.fonts.ready) {
+          try { await document.fonts.ready; } catch(e) {}
+        }
+
+        // 6. Await pending images
+        const pendingImages = Array.from(document.images).filter(img => !img.complete && img.src);
+        if (pendingImages.length > 0) {
+          await Promise.race([
+            Promise.all(pendingImages.map(img => {
+              if (img.decode) return img.decode().catch(() => {});
+              return new Promise(res => { img.onload = img.onerror = res; setTimeout(res, 1000); });
+            })),
+            new Promise(res => setTimeout(res, 2000))
+          ]);
+        }
+
+        // 7. Settle layout and restore scroll to original user position
+        await new Promise(r => setTimeout(r, 150));
+        window.scrollTo({ top: initialScrollY, left: initialScrollX, behavior: 'instant' });
+        window.dispatchEvent(new Event('scroll'));
+        await new Promise(r => setTimeout(r, 100));
+      }
+    });
+  } catch (e) {
+    console.warn('Hydration script warning:', e);
+  }
+
+  if (onProgress) onProgress(25, 'Hydration complete!');
+}
+
+// ─── Native Viewport Slices Capture Engine (1440 x 900–1200px) ───
+async function captureViewportChunks(tab) {
+  setCaptureProgress(5, 'Deep hydrating page...');
+
+  // 1. Read initial state before anything touches the page
+  const [initGeom] = await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    func: () => ({
+      origX: window.scrollX,
+      origY: window.scrollY,
+      viewportHeight: window.innerHeight,
+      viewportWidth: window.innerWidth,
+      dpr: window.devicePixelRatio || 1
+    })
+  });
+
+  const { origX, origY, viewportHeight, viewportWidth, dpr } = initGeom.result;
+
+  // 2. Perform deep hydration
+  await performDeepPageHydration(tab.id, (pct, msg) => setCaptureProgress(pct, msg));
+
+  // 3. Target slice size: native viewport height (capped at 1200px max)
+  const sliceHeight = Math.min(1200, Math.max(600, viewportHeight));
+
+  // Re-measure full height after hydration
+  const [sizeRes] = await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    func: () => Math.max(document.body.scrollHeight, document.documentElement.scrollHeight)
+  });
+  let totalHeight = sizeRes.result || viewportHeight;
+
+  const numChunks = Math.max(1, Math.ceil(totalHeight / sliceHeight));
+  const generatedChunks = [];
+
+  try {
+    for (let i = 0; i < numChunks; i++) {
+      const targetY = i * sliceHeight;
+      const percent = Math.round(30 + ((i / numChunks) * 65));
+      setCaptureProgress(percent, `Capturing viewport slice ${i + 1} of ${numChunks}...`);
+
+      // Scroll to position, hide fixed/sticky elements on step > 0, re-measure page height
+      const [stepInfo] = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        args: [scrollY, step],
-        func: (y, stepIndex) => {
+        args: [targetY, i, totalHeight],
+        func: (y, stepIndex, currentTotalH) => {
           window.scrollTo({ top: y, left: 0, behavior: 'instant' });
+          const actualY = window.scrollY;
+          const freshHeight = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+
+          // Hide fixed/sticky elements from step 1 onward (both top headers & bottom widgets)
           if (stepIndex > 0) {
             if (!window.__design2md_hidden_fixed) {
               window.__design2md_hidden_fixed = [];
@@ -735,7 +911,9 @@ async function captureFullPageScreenshot(tab) {
                 const style = window.getComputedStyle(el);
                 if (style.position === 'fixed' || style.position === 'sticky') {
                   const rect = el.getBoundingClientRect();
-                  if (rect.top <= 120 && rect.height < 200) {
+                  const isTopHeader = rect.top <= 120 && rect.height < 250;
+                  const isBottomWidget = rect.bottom >= (window.innerHeight - 150) && rect.height < 250;
+                  if (isTopHeader || isBottomWidget) {
                     window.__design2md_hidden_fixed.push({ el, origVis: el.style.visibility });
                     el.style.visibility = 'hidden';
                   }
@@ -743,99 +921,75 @@ async function captureFullPageScreenshot(tab) {
               });
             }
           }
+          return { actualY, freshHeight };
         }
       });
 
-      // Brief pause for lazy load images / repaint
+      if (stepInfo?.result?.freshHeight && stepInfo.result.freshHeight > totalHeight) {
+        totalHeight = stepInfo.result.freshHeight;
+      }
+
       await new Promise(r => setTimeout(r, 260));
 
-      // Capture visible tab chunk at native resolution
-      const dataUrl = await new Promise((resolve, reject) => {
-        chrome.tabs.captureVisibleTab(null, { format: 'png' }, (res) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-          } else if (!res) {
-            reject(new Error('Empty capture received'));
-          } else {
-            resolve(res);
-          }
-        });
-      });
+      // Throttled capture via background service worker
+      const dataUrl = await requestTabCapture(tab);
 
-      rawChunks.push({ dataUrl, y: scrollY, step });
+      const actualY = stepInfo?.result?.actualY ?? targetY;
+      const remainingHeight = totalHeight - actualY;
+
+      // Crop the bottom of the last chunk if it's shorter than viewport
+      if (remainingHeight < viewportHeight && i === numChunks - 1 && remainingHeight > 50) {
+        const cropCanvas = document.createElement('canvas');
+        cropCanvas.width = Math.round(viewportWidth * dpr);
+        cropCanvas.height = Math.round(remainingHeight * dpr);
+        const ctx = cropCanvas.getContext('2d');
+
+        const img = new Image();
+        img.src = dataUrl;
+        await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+
+        ctx.drawImage(img, 0, 0, img.width, Math.round(remainingHeight * dpr), 0, 0, cropCanvas.width, cropCanvas.height);
+        const croppedBlob = await new Promise(res => cropCanvas.toBlob(res, 'image/png'));
+        const chunkNum = String(i + 1).padStart(2, '0');
+        generatedChunks.push({
+          chunkIndex: i,
+          filename: `chunk_${chunkNum}.png`,
+          blob: croppedBlob
+        });
+      } else {
+        const chunkBlob = dataUrlToBlob(dataUrl);
+        const chunkNum = String(i + 1).padStart(2, '0');
+        generatedChunks.push({
+          chunkIndex: i,
+          filename: `chunk_${chunkNum}.png`,
+          blob: chunkBlob
+        });
+      }
     }
   } finally {
-    // Always restore page scroll & sticky headers
+    // ALWAYS remove injected hydration style, restore sticky/fixed elements, and restore original scroll
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
-      args: [origScrollX, origScrollY],
-      func: (origX, origY) => {
-        window.scrollTo({ top: origY, left: origX, behavior: 'instant' });
+      args: [origX, origY],
+      func: (restoreX, restoreY) => {
+        const style = document.getElementById('__design2md_hydration_style');
+        if (style) style.remove();
+
         if (window.__design2md_hidden_fixed) {
           window.__design2md_hidden_fixed.forEach(item => {
             item.el.style.visibility = item.origVis;
           });
           delete window.__design2md_hidden_fixed;
         }
+
+        window.scrollTo({ top: restoreY, left: restoreX, behavior: 'instant' });
       }
     });
   }
 
-  // Convert each chunk to an individual high-res PNG Blob
-  const chunkList = rawChunks.map((chunk, i) => {
-    const filename = `chunk_${String(i + 1).padStart(2, '0')}.png`;
-    return {
-      step: chunk.step,
-      filename,
-      blob: dataUrlToBlob(chunk.dataUrl),
-      dataUrl: chunk.dataUrl,
-      y: chunk.y
-    };
-  });
-
-  // 2. Stitch chunks onto Canvas for optional master overview (safeguarded against OOM)
-  setCaptureProgress(82, 'Generating master stitched preview...');
-  let stitchedBlob = null;
-
-  try {
-    let canvasDpr = dpr;
-    if (totalHeight * canvasDpr > 16384) {
-      canvasDpr = Math.min(1.0, 16384 / totalHeight);
-    }
-    const maxDimension = 16384;
-    const targetWidth = Math.min(maxDimension, Math.round(viewportWidth * canvasDpr));
-    const targetHeight = Math.min(maxDimension, Math.round(totalHeight * canvasDpr));
-
-    const canvas = document.createElement('canvas');
-    canvas.width = targetWidth;
-    canvas.height = targetHeight;
-    const ctx = canvas.getContext('2d');
-
-    if (ctx) {
-      for (let i = 0; i < rawChunks.length; i++) {
-        const chunk = rawChunks[i];
-        const img = new Image();
-        img.src = chunk.dataUrl;
-        await new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = reject;
-        });
-
-        const destY = Math.round(chunk.y * canvasDpr);
-        const destHeight = Math.round(viewportHeight * canvasDpr);
-        ctx.drawImage(img, 0, 0, img.width, img.height, 0, destY, canvas.width, destHeight);
-      }
-
-      setCaptureProgress(94, 'Encoding stitched image...');
-      stitchedBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-    }
-  } catch (canvasErr) {
-    console.warn('Stitched canvas generation skipped (page height exceeds memory):', canvasErr);
-  }
-
   return {
-    chunks: chunkList,
-    stitchedBlob
+    chunks: generatedChunks,
+    numChunks: generatedChunks.length
   };
 }
 
@@ -844,7 +998,7 @@ async function handleCaptureScreenshot() {
   const isExtensionEnv = typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.query;
 
   if (!isExtensionEnv) {
-    showToast('Visual chunks capture requires opening extension on a live website tab');
+    showToast('Visual capture requires opening extension on a live website tab');
     return;
   }
 
@@ -855,15 +1009,15 @@ async function handleCaptureScreenshot() {
   } catch (e) {}
 
   if (!tab || !tab.id || tab.url?.startsWith('file://') || tab.url?.startsWith('chrome://')) {
-    showToast('Open a live website (like stripe.com) to capture visual slices');
+    showToast('Open a live website to capture visual slices');
     return;
   }
 
   btn.disabled = true;
   try {
-    const captureResult = await captureFullPageScreenshot(tab);
-    setCaptureProgress(98, 'Packaging crisp visual chunks...');
-    const domain = extractedData?.meta?.domain?.replace(/[^a-zA-Z0-9]/g, '_') || 'site';
+    const captureResult = await captureViewportChunks(tab);
+    setCaptureProgress(95, `Packaging ${captureResult.chunks.length} viewport slices...`);
+    const domain = extractedData?.meta?.domain?.replace(/[^a-zA-Z0-9]/g, '_') || 'target_site';
 
     if (captureResult.chunks.length === 1) {
       downloadBlob(captureResult.chunks[0].blob, `${domain}_chunk_01.png`);
@@ -872,14 +1026,11 @@ async function handleCaptureScreenshot() {
       captureResult.chunks.forEach(c => {
         zip.file(c.filename, c.blob);
       });
-      if (captureResult.stitchedBlob) {
-        zip.file('FULL_STITCHED_OVERVIEW.png', captureResult.stitchedBlob);
-      }
       const zipBlob = await zip.generateAsync({ type: 'blob' });
-      downloadBlob(zipBlob, `${domain}_VISUAL_CHUNKS.zip`);
+      downloadBlob(zipBlob, `${domain}_VIEWPORT_CHUNKS.zip`);
     }
 
-    setCaptureProgress(100, 'Chunks Ready!');
+    setCaptureProgress(100, `Done! ${captureResult.chunks.length} Slices Saved`);
     setTimeout(() => hideCaptureProgress(), 1800);
   } catch (err) {
     console.error('Screenshot capture failed:', err);
@@ -900,8 +1051,8 @@ async function handleDownloadZipBundle() {
 
   btn.disabled = true;
   try {
-    setCaptureProgress(20, 'Preparing bundle files...');
-    const domain = extractedData?.meta?.domain?.replace(/[^a-zA-Z0-9]/g, '_') || 'stripe_com';
+    setCaptureProgress(15, 'Preparing bundle specifications...');
+    const domain = extractedData?.meta?.domain?.replace(/[^a-zA-Z0-9]/g, '_') || 'target_site';
     const zip = new JSZip();
     const folderName = `${domain}_Clone_Bundle`;
     const folder = zip.folder(folderName);
@@ -915,28 +1066,27 @@ async function handleDownloadZipBundle() {
     const promptText = promptMatch ? promptMatch[1].trim() : (designMarkdown || fullMarkdown);
     folder.file('AI_CODING_PROMPT.txt', promptText || 'Rebuild this site matching DESIGN.md and UI.md');
 
-    // If running in live website tab, capture screenshots too!
+    // Capture viewport-sized visual chunks
     const isExtensionEnv = typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.query;
     if (isExtensionEnv) {
       try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (tab && tab.id && !tab.url?.startsWith('file://') && !tab.url?.startsWith('chrome://')) {
-          setCaptureProgress(40, 'Capturing live visual chunks...');
-          const captureResult = await captureFullPageScreenshot(tab);
+          setCaptureProgress(30, 'Capturing viewport visual slices...');
+          const captureResult = await captureViewportChunks(tab);
           const ssFolder = folder.folder('screenshots');
           captureResult.chunks.forEach(c => {
             ssFolder.file(c.filename, c.blob);
           });
-          if (captureResult.stitchedBlob) {
-            ssFolder.file('FULL_STITCHED_PAGE.png', captureResult.stitchedBlob);
-          }
         }
-      } catch (e) {
-        console.warn('Screenshot in zip skipped:', e);
+      } catch (ssErr) {
+        console.warn('Screenshot in zip skipped due to error:', ssErr);
+        folder.file('SCREENSHOT_NOTICE.txt', `Screenshots could not be captured: ${ssErr.message}\nAll markdown specifications (DESIGN.md, UI.md, FULL_CLONE.md) are complete.`);
+        showToast(`Screenshots skipped: ${ssErr.message}`);
       }
     }
 
-    setCaptureProgress(90, 'Generating ZIP package...');
+    setCaptureProgress(92, 'Generating final ZIP bundle...');
     const zipBlob = await zip.generateAsync({
       type: 'blob',
       compression: 'DEFLATE',
@@ -961,3 +1111,4 @@ if (document.readyState === 'loading') {
 } else {
   initPopup();
 }
+

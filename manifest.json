@@ -1,12 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "Design2MD Pro - UI & Design Clone Engine",
-  "version": "2.1.0",
-  "description": "Deep clone any website's design system into DESIGN.md and page wireframe into UI.md for Antigravity & AI coding assistants.",
+  "name": "Design2MD Pro - UI & Design System Clone Engine",
+  "version": "2.3.0",
+  "description": "Extracts real measured design tokens into DESIGN.md and structural wireframe into UI.md for AI coding assistants.",
   "permissions": [
     "activeTab",
     "scripting"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
