@@ -34,17 +34,23 @@ async function initPopup() {
   }
 
   try {
-    // 0. Pre-scroll page down & up to mount lazy-loaded DOM sections & SPAs
+    // 0. Progressive hydration sweep to mount lazy animations, IntersectionObservers, and SPAs
     try {
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: async () => {
           const orig = window.scrollY;
-          window.scrollTo({ top: document.body.scrollHeight / 2, behavior: 'instant' });
-          await new Promise(r => setTimeout(r, 60));
-          window.scrollTo({ top: document.body.scrollHeight, behavior: 'instant' });
-          await new Promise(r => setTimeout(r, 60));
+          const totalH = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+          const vh = window.innerHeight || 800;
+          const steps = Math.min(10, Math.max(4, Math.ceil(totalH / vh)));
+          for (let i = 1; i <= steps; i++) {
+            const y = Math.min(totalH, (i / steps) * totalH);
+            window.scrollTo({ top: y, behavior: 'instant' });
+            await new Promise(r => setTimeout(r, 120));
+          }
+          await new Promise(r => setTimeout(r, 180));
           window.scrollTo({ top: orig, behavior: 'instant' });
+          await new Promise(r => setTimeout(r, 100));
         }
       });
     } catch (e) {}
