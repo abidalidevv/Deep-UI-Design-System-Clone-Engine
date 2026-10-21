@@ -38,11 +38,11 @@ Target Website (e.g., Stripe / Linear)
 
 ## 💎 Two Modular Specifications: `DESIGN.md` vs `UI.md`
 
-| Feature | 🎨 `DESIGN.md` *(Tokens & Style)* | 📐 `UI.md` *(Sections & Wireframe)* |
-| :--- | :--- | :--- |
-| **Best For** | Applying this website's **aesthetic & colors** to your own app or tool. | Cloning the **exact page layout, sections & structure** of the website. |
-| **Contents** | • Synthesized `:root` CSS variables<br>• Complete Color Palette (Surfaces, Text, Borders)<br>• Typography hierarchy (`H1` to `P`) & Font imports<br>• Border radius scale, shadows, glassmorphism<br>• Micro-interaction transitions & hover states<br>• **Anti-Generic AI Directives** | • **Executive Page Rhythm Map** (Sequence & heights)<br>• Section-by-section blueprint (Hero, Bento, FAQ, Footer)<br>• Container dimensions, Flex/Grid column counts<br>• Sample headings, copy, and visual media<br>• **Ready-to-Use HTML/CSS Component Starters** |
-| **Export Action** | 📥 **Download DESIGN.md** or copy `:root CSS` | 📥 **Download UI.md** or copy sections wireframe |
+| Feature | 🎨 `DESIGN.md` *(Tokens & Style)* | 📐 `UI.md` *(Sections & Wireframe)* | 📸 `Visual Chunks` & 📦 `ZIP Bundle` |
+| :--- | :--- | :--- | :--- |
+| **Best For** | Applying this website's **aesthetic & colors** to your own app or tool. | Cloning the **exact page layout, sections & structure** of the website. | Feeding **individual crisp section screenshots** + **code context** to Multimodal AI without token downscaling blur! |
+| **Contents** | • Synthesized `:root` CSS variables<br>• Complete Color Palette (Surfaces, Text, Borders)<br>• Typography hierarchy (`H1` to `P`) & Font features<br>• Component pseudo-states (`:hover`, `:focus`) from CSS<br>• Tailwind CSS utility class detection<br>• Mathematical spacing grid (4px/8px) | • **Executive Page Rhythm Map** (Sequence & heights)<br>• **Asli DOM Tree Skeleton** per section with structural placeholders (`[Heading]`, `[Paragraph]`, `[Image]`)<br>• Direct mapping to `screenshots/chunk_XX.png`<br>• Exact flexbox, grid, z-index, & positioning rules | • **Crisp Viewport Slices (.png)** captured chunk-by-chunk at native 1080p/2K resolution.<br>• Eliminates IDE downscaling blur (no 16,000px mush!).<br>• **📦 Clone ZIP Bundle** bundling `DESIGN.md`, `UI.md`, `FULL_CLONE.md`, `AI_CODING_PROMPT.txt`, and a dedicated `screenshots/` directory with all section chunks. |
+| **Export Action** | 📥 **Download DESIGN.md** or copy `:root CSS` | 📥 **Download UI.md** or copy sections wireframe | 📸 **Visual Chunks (.zip)** or 📦 **Clone ZIP Bundle** |
 
 ---
 
@@ -50,21 +50,18 @@ Target Website (e.g., Stripe / Linear)
 
 Works in **Google Chrome**, **Brave**, **Arc**, and **Microsoft Edge**:
 
-1. Clone or download this repository:
-   ```bash
-   git clone https://github.com/abidalidevv/Deep-UI-Design-System-Clone-Engine.git
-   ```
-2. Open your browser and navigate to:
+1. Open your browser and navigate to:
    ```text
    chrome://extensions/
    ```
-3. In the top-right corner, toggle **ON** **"Developer mode"**.
-4. In the top-left corner, click **"Load unpacked"**.
-5. Select the repository directory:
+2. In the top-right corner, toggle **ON** **"Developer mode"**.
+3. In the top-left corner, click **"Load unpacked"**.
+4. Select the extension directory:
    ```text
-   C:\Users\Ali\.gemini\antigravity-ide\scratch\ui-spec-extractor-extension
+   C:\Users\Ali\Desktop\clone ui\Deep-UI-Design-System-Clone-Engine
    ```
-6. **Done!** Click the puzzle icon in Chrome and **pin Design2MD** to your toolbar for instant 1-click access.
+   *(or `C:\Users\Ali\.gemini\antigravity-ide\scratch\ui-spec-extractor-extension`)*
+5. **Done!** Click the puzzle icon in Chrome and **pin Design2MD Pro** to your toolbar for instant 1-click access.
 
 ---
 
@@ -72,15 +69,17 @@ Works in **Google Chrome**, **Brave**, **Arc**, and **Microsoft Edge**:
 
 1. Navigate to **any webpage** whose design or layout you admire (e.g. `stripe.com`, `linear.app`, `vercel.com`, `apple.com`).
 2. Click the **Design2MD Pro** toolbar icon.
-3. The popup automatically scans the page and displays:
+3. The popup automatically pre-scrolls to mount lazy sections, scans the page, and displays:
    - **Active Target:** Site domain, page title, and Dark/Light mode detection.
    - **Dual Export Hub:** Dedicated buttons for `DESIGN.md` and `UI.md`.
+   - **Visual Capture Hub:** `📸 Visual Chunks (.zip)` and `📦 Clone ZIP Bundle`.
    - **Interactive Tabs:** Clickable color swatches (with hex copy), typography scale, vertical sections timeline, and component specs.
 4. Export with 1 click:
    - 🎨 Click **"Download DESIGN.md"** for design tokens and CSS variables.
-   - 📐 Click **"Download UI.md"** for sections and page wireframes.
+   - 📐 Click **"Download UI.md"** for sections and real DOM wireframe skeletons.
+   - 📸 Click **"Visual Chunks (.zip)"** to download individual native-res section slices.
+   - 📦 Click **"Clone ZIP Bundle"** to download all specs + AI prompt + `screenshots/` folder in one complete ZIP archive.
    - 🤖 Click **"Copy Antigravity Master Prompt"** for the ready-to-paste AI prompt.
-   - 📦 Click **"Full Spec"** to download both in one single document.
 
 ---
 

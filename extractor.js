@@ -61,11 +61,21 @@ function extractDesignSystem() {
       backdropFilter: (s.backdropFilter && s.backdropFilter !== 'none') ? s.backdropFilter : (s.webkitBackdropFilter && s.webkitBackdropFilter !== 'none') ? s.webkitBackdropFilter : null,
       display: s.display,
       flexDirection: s.display === 'flex' ? s.flexDirection : null,
+      flexWrap: (s.display === 'flex' && s.flexWrap !== 'nowrap') ? s.flexWrap : null,
       alignItems: (s.display === 'flex' || s.display === 'grid') ? s.alignItems : null,
       justifyContent: (s.display === 'flex' || s.display === 'grid') ? s.justifyContent : null,
       gap: (s.gap && s.gap !== 'normal' && s.gap !== '0px') ? s.gap : null,
       gridTemplateColumns: s.display === 'grid' ? s.gridTemplateColumns : null,
-      position: (s.position === 'fixed' || s.position === 'sticky') ? s.position : null,
+      gridTemplateRows: (s.display === 'grid' && s.gridTemplateRows !== 'none') ? s.gridTemplateRows : null,
+      maxWidth: (s.maxWidth && s.maxWidth !== 'none') ? s.maxWidth : null,
+      width: (s.width && s.width !== 'auto') ? s.width : null,
+      height: (s.height && s.height !== 'auto') ? s.height : null,
+      position: (s.position && s.position !== 'static') ? s.position : null,
+      zIndex: (s.zIndex && s.zIndex !== 'auto') ? s.zIndex : null,
+      top: (s.top && s.top !== 'auto') ? s.top : null,
+      bottom: (s.bottom && s.bottom !== 'auto') ? s.bottom : null,
+      left: (s.left && s.left !== 'auto') ? s.left : null,
+      right: (s.right && s.right !== 'auto') ? s.right : null,
       overflow: (s.overflow !== 'visible') ? s.overflow : null,
       opacity: s.opacity !== '1' ? s.opacity : null,
       transform: (s.transform && s.transform !== 'none') ? s.transform : null,
@@ -82,6 +92,164 @@ function extractDesignSystem() {
       }
     }
     return cleaned;
+  }
+
+  // ─── Real Trimmed DOM Skeleton Generator ──────────────────────────
+  function buildTrimmedDOMSkeleton(rootEl, maxDepth = 4) {
+    function walk(node, depth) {
+      if (!node || depth > maxDepth) return '';
+      if (node.nodeType === Node.TEXT_NODE) return '';
+      if (node.nodeType !== Node.ELEMENT_NODE) return '';
+
+      const tag = node.tagName.toLowerCase();
+      if (['script', 'style', 'noscript', 'iframe', 'template'].includes(tag)) return '';
+      if (node.offsetWidth === 0 && node.offsetHeight === 0 && tag !== 'svg') return '';
+
+      const indent = '  '.repeat(depth);
+      const classes = node.className && typeof node.className === 'string' ? node.className.trim() : '';
+      const classAttr = classes ? ` class="${classes.split(/\s+/).slice(0, 5).join(' ')}"` : '';
+      const idAttr = node.id ? ` id="${node.id}"` : '';
+
+      if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tag)) {
+        const textPreview = cleanText(node.innerText).slice(0, 40);
+        const hint = textPreview ? ` "${textPreview}"` : '';
+        return `${indent}<${tag}${idAttr}${classAttr}>[${tag.toUpperCase()}${hint}]</${tag}>\n`;
+      }
+
+      if (tag === 'p') {
+        const textPreview = cleanText(node.innerText).slice(0, 35);
+        const hint = textPreview ? ` "${textPreview}..."` : '';
+        return `${indent}<p${idAttr}${classAttr}>[Paragraph${hint}]</p>\n`;
+      }
+
+      if (tag === 'button' || (tag === 'a' && (classes.includes('btn') || classes.includes('button')))) {
+        const textPreview = cleanText(node.innerText).slice(0, 30);
+        const hint = textPreview ? ` "${textPreview}"` : ' CTA';
+        return `${indent}<${tag}${idAttr}${classAttr}>[Button:${hint}]</${tag}>\n`;
+      }
+
+      if (tag === 'img') {
+        const w = node.offsetWidth || node.width;
+        const h = node.offsetHeight || node.height;
+        return `${indent}<img${idAttr}${classAttr} src="[Image: ${w}x${h}]" alt="[Image]"/>\n`;
+      }
+
+      if (tag === 'svg') {
+        const w = node.getAttribute('width') || node.offsetWidth || 24;
+        const h = node.getAttribute('height') || node.offsetHeight || 24;
+        return `${indent}<svg${idAttr}${classAttr} width="${w}" height="${h}">[SVG Icon]</svg>\n`;
+      }
+
+      if (['input', 'textarea', 'select'].includes(tag)) {
+        const type = node.type || tag;
+        const ph = node.placeholder ? ` placeholder="[${node.placeholder}]"` : '';
+        return `${indent}<${tag} type="${type}"${idAttr}${classAttr}${ph}/>\n`;
+      }
+
+      const children = Array.from(node.children);
+      if (children.length === 0) {
+        const txt = cleanText(node.innerText);
+        if (txt && txt.length < 50) {
+          return `${indent}<${tag}${idAttr}${classAttr}>[Text: "${txt.slice(0, 30)}"]</${tag}>\n`;
+        }
+        return `${indent}<${tag}${idAttr}${classAttr}></${tag}>\n`;
+      }
+
+      let inner = '';
+      const cappedChildren = children.slice(0, 6);
+      cappedChildren.forEach(child => {
+        inner += walk(child, depth + 1);
+      });
+      if (children.length > 6) {
+        inner += `${indent}  <!-- ... +${children.length - 6} more sibling items ... -->\n`;
+      }
+
+      return `${indent}<${tag}${idAttr}${classAttr}>\n${inner}${indent}</${tag}>\n`;
+    }
+
+    return walk(rootEl, 0).trim();
+  }
+
+  // ─── Framework & Tailwind Detection ──────────────────────────
+  function detectFrameworks() {
+    const fw = {
+      tailwind: false,
+      tailwindClassCount: 0,
+      tailwindSamples: [],
+      bootstrap: false,
+      shadcnRadix: false,
+      materialUI: false
+    };
+
+    const allNodes = Array.from(document.querySelectorAll('*')).slice(0, 1000);
+    const tailwindRegex = /^(p[xytrbl]?-\d+|m[xytrbl]?-\d+|bg-\w+-\d+|text-\w+-\d+|flex|grid|gap-\d+|rounded-(?:sm|md|lg|xl|2xl|full)|border-\w+|shadow-(?:sm|md|lg|xl|2xl)|items-center|justify-between|w-full|h-screen|max-w-\w+)$/;
+    const twClasses = new Set();
+
+    allNodes.forEach(el => {
+      if (el.className && typeof el.className === 'string') {
+        const classes = el.className.split(/\s+/);
+        classes.forEach(c => {
+          if (tailwindRegex.test(c)) {
+            fw.tailwindClassCount++;
+            twClasses.add(c);
+          }
+          if (c.startsWith('btn-') || c.startsWith('col-') || c === 'container-fluid') fw.bootstrap = true;
+          if (c.startsWith('Mui') || c.startsWith('css-')) fw.materialUI = true;
+          if (c.startsWith('radix-') || el.hasAttribute('data-radix-collection-item')) fw.shadcnRadix = true;
+        });
+      }
+    });
+
+    if (fw.tailwindClassCount >= 15) {
+      fw.tailwind = true;
+      fw.tailwindSamples = Array.from(twClasses).slice(0, 20);
+    }
+
+    return fw;
+  }
+
+  // ─── Stylesheet Pseudo-Class Parser (:hover, :focus) ──────────────
+  function extractPseudoStates() {
+    const pseudoRules = {
+      buttons: [],
+      links: [],
+      cards: []
+    };
+
+    try {
+      for (const sheet of document.styleSheets) {
+        try {
+          for (const rule of (sheet.cssRules || [])) {
+            if (rule.selectorText && rule.selectorText.includes(':hover')) {
+              const sel = rule.selectorText;
+              const style = rule.style;
+              if (!style) continue;
+
+              const change = {};
+              ['background', 'backgroundColor', 'color', 'borderColor', 'transform', 'boxShadow', 'opacity'].forEach(prop => {
+                const val = style.getPropertyValue(prop.replace(/([A-Z])/g, '-$1').toLowerCase());
+                if (val) change[prop] = val;
+              });
+
+              if (Object.keys(change).length > 0) {
+                if (sel.includes('btn') || sel.includes('button')) {
+                  pseudoRules.buttons.push({ selector: sel.slice(0, 60), state: ':hover', change });
+                } else if (sel.includes('card') || sel.includes('tile')) {
+                  pseudoRules.cards.push({ selector: sel.slice(0, 60), state: ':hover', change });
+                } else if (sel.includes('a') || sel.includes('nav')) {
+                  pseudoRules.links.push({ selector: sel.slice(0, 60), state: ':hover', change });
+                }
+              }
+            }
+          }
+        } catch (e) { /* cross-origin rules ignored */ }
+      }
+    } catch (e) {}
+
+    pseudoRules.buttons = pseudoRules.buttons.slice(0, 5);
+    pseudoRules.cards = pseudoRules.cards.slice(0, 4);
+    pseudoRules.links = pseudoRules.links.slice(0, 4);
+    return pseudoRules;
   }
 
   // ─── Main Data Object ──────────────────────────
@@ -115,6 +283,9 @@ function extractDesignSystem() {
       badges: [],
       footer: null
     },
+    framework: detectFrameworks(),
+    pseudoStates: extractPseudoStates(),
+    darkThemeVariables: {},
     animations: { transitions: [], keyframes: [] },
     icons: { library: null, samples: [] },
     images: { treatments: [] },
@@ -129,17 +300,28 @@ function extractDesignSystem() {
   const bodyBg = rgbToHex(bodyStyle?.backgroundColor) || rgbToHex(htmlStyle?.backgroundColor) || '#FFFFFF';
   result.mode = getLuminance(bodyBg) < 0.4 ? 'Dark Mode' : 'Light Mode';
 
-  // ─── 2. CSS Custom Properties from :root ──────────────────────────
+  // ─── 2. CSS Custom Properties (:root + theme classes) ─────────────
   try {
     for (const sheet of document.styleSheets) {
       try {
         for (const rule of (sheet.cssRules || [])) {
-          if (rule.selectorText === ':root' || rule.selectorText === 'html' || rule.selectorText === ':root, :host') {
+          if (!rule.selectorText) continue;
+          const sel = rule.selectorText.toLowerCase();
+          const isThemeDark = sel.includes('dark') || sel.includes('theme="dark"') || sel.includes('theme=\'dark\'');
+          const isRootOrGlobal = sel === ':root' || sel === 'html' || sel === 'body' || sel === ':root, :host';
+
+          if (isRootOrGlobal || isThemeDark) {
             for (let i = 0; i < rule.style.length; i++) {
               const prop = rule.style[i];
-              if (prop.startsWith('--')) {
+              if (prop && prop.startsWith('--')) {
                 const val = rule.style.getPropertyValue(prop).trim();
-                if (val) result.cssVariables[prop] = val;
+                if (val) {
+                  if (isThemeDark) {
+                    result.darkThemeVariables[prop] = val;
+                  } else {
+                    result.cssVariables[prop] = val;
+                  }
+                }
               }
             }
           }
@@ -311,6 +493,8 @@ function extractDesignSystem() {
           lineHeight: s.lineHeight,
           letterSpacing: s.letterSpacing !== 'normal' ? s.letterSpacing : null,
           textTransform: s.textTransform !== 'none' ? s.textTransform : null,
+          fontFeatureSettings: (s.fontFeatureSettings && s.fontFeatureSettings !== 'normal') ? s.fontFeatureSettings : null,
+          textWrap: (s.textWrap && s.textWrap !== 'auto') ? s.textWrap : null,
           color: rgbToHex(s.color),
           sampleText: cleanText(el.innerText).slice(0, 80)
         };
@@ -318,11 +502,33 @@ function extractDesignSystem() {
     }
   });
 
-  // Compile sets
+  // Body font feature settings
+  const bodyComputedStyle = getElStyle(document.body);
+  if (bodyComputedStyle?.fontFeatureSettings && bodyComputedStyle.fontFeatureSettings !== 'normal') {
+    result.typography.globalFontFeatures = bodyComputedStyle.fontFeatureSettings;
+  }
+
+  // Compile sets & aggregated spacing scale
   result.shadows = Array.from(shadowSet).slice(0, 8);
   result.radii = Array.from(radiusSet).slice(0, 10);
   result.animations.transitions = Array.from(transitionSet).slice(0, 8);
-  result.layout.spacingTokens = Array.from(spacingValues).sort().slice(0, 12);
+
+  // Group numeric pixel spacing values
+  const pxSpacingMap = {};
+  spacingValues.forEach(val => {
+    const match = val.match(/^(\d+(?:\.\d+)?)px$/);
+    if (match) {
+      const num = Math.round(parseFloat(match[1]));
+      if (num > 0 && num <= 160) {
+        pxSpacingMap[num] = (pxSpacingMap[num] || 0) + 1;
+      }
+    }
+  });
+  const sortedCommonSpacing = Object.keys(pxSpacingMap).map(Number).sort((a, b) => a - b);
+  result.layout.spacingTokens = sortedCommonSpacing.length > 0
+    ? sortedCommonSpacing.map(n => `${n}px`).slice(0, 12)
+    : Array.from(spacingValues).sort().slice(0, 12);
+  result.layout.baseGrid = sortedCommonSpacing.some(n => n === 8 || n === 16 || n === 24) ? '8px Grid System' : '4px Grid System';
 
   // ─── 7. Extract Media Query Breakpoints ──────────────────────────
   const breakpointSet = new Set();
@@ -498,7 +704,7 @@ function extractDesignSystem() {
     processedSections.push({
       type: sectionType,
       tag: tag,
-      classes: classes.slice(0, 80),
+      classes: classes.slice(0, 100),
       id: id || null,
       position: { width: Math.round(rect.width), height: absHeight, top: absTop },
       style: cleanStyle({
@@ -506,11 +712,17 @@ function extractDesignSystem() {
         backgroundImage: (s.backgroundImage && s.backgroundImage !== 'none') ? s.backgroundImage.slice(0, 200) : null,
         color: rgbToHex(s.color),
         padding: s.padding,
+        margin: (s.margin && s.margin !== '0px') ? s.margin : null,
+        maxWidth: (s.maxWidth && s.maxWidth !== 'none') ? s.maxWidth : null,
+        position: (s.position && s.position !== 'static') ? s.position : null,
+        zIndex: (s.zIndex && s.zIndex !== 'auto') ? s.zIndex : null,
+        overflow: (s.overflow && s.overflow !== 'visible') ? s.overflow : null,
         textAlign: s.textAlign !== 'start' ? s.textAlign : null,
         borderBottom: (s.borderBottomWidth !== '0px') ? `${s.borderBottomWidth} ${s.borderBottomStyle} ${rgbToHex(s.borderBottomColor)}` : null,
         backdropFilter: (s.backdropFilter && s.backdropFilter !== 'none') ? s.backdropFilter : null
       }),
       layout: { type: layoutType, details: columnInfo },
+      domSkeleton: buildTrimmedDOMSkeleton(el, 4),
       childCount: children.length,
       content: {
         headings: headings,
@@ -778,14 +990,21 @@ function generateDesignTokensMD(data) {
   md += `> **Role:** Master Design System file (\`DESIGN.md\`) to apply this exact visual aesthetic to any tool or website.  \n\n`;
   md += `---\n\n`;
 
-  // 1. Anti-Generic AI Directives
-  md += `## 1. 🛡️ Anti-Generic AI Directives (Must-Follow Quality Rules)\n\n`;
-  md += `> **ATTENTION AI CODING AGENT:** When building or styling code for this project, you MUST adhere strictly to these visual quality rules. Do NOT revert to standard, unstyled, or generic AI templates.\n\n`;
-  md += `- ❌ **NEVER use generic saturated colors:** Avoid plain blue (\`#2563EB\`), flat pure black (\`#000000\`), or default gray (\`#6B7280\`). Strictly use the exact HSL/Hex palette defined in this document.\n`;
-  md += `- ❌ **NEVER use browser default typography:** Headings MUST use tightened letter-spacing (\`${tok['--letter-spacing-h1'] || '-0.025em'}\`) and bold weights (\`${tok['--font-weight-h1'] || '700/800'}\`). Un-tracked headings look amateur.\n`;
-  md += `- ❌ **NEVER use flat, borderless cards:** Modern premium websites always use a subtle 1px border highlight (\`border: 1px solid var(--border-subtle)\`) combined with elevation shadows (\`var(--shadow-card)\`).\n`;
-  md += `- ❌ **NEVER skip micro-interactions:** Every interactive button, link, and card MUST have smooth transitions: \`transition: var(--transition-smooth)\` and hover states (e.g., slight lift \`transform: translateY(-2px)\` or border brightening).\n`;
-  md += `- ❌ **NEVER make cramped layouts:** Maintain generous whitespace (\`padding: 80px 0\` on sections, \`gap: 24px\` on grids).\n\n`;
+  // 1. Dynamic Architectural Directives (Extracted from live DOM)
+  md += `## 1. 🛡️ Architectural & Visual Quality Directives\n\n`;
+  md += `> **ATTENTION AI CODING AGENT:** When building or styling code for this project, you MUST adhere strictly to the actual design tokens and visual architecture extracted from **${m.domain}**. Do NOT revert to standard, unstyled, or generic AI templates.\n\n`;
+  md += `- 🎯 **Color Palette Fidelity:** Use ONLY the exact HSL/Hex palette defined in this document (\`var(--bg-primary)\`, \`var(--bg-surface)\`, \`var(--text-primary)\`). Do not invent saturated default blues or grays.\n`;
+  md += `- 🎯 **Typography Tracking:** Headings MUST use tightened letter-spacing (\`${tok['--letter-spacing-h1'] || '-0.025em'}\`) and bold weights (\`${tok['--font-weight-h1'] || '700/800'}\`). Un-tracked headings look amateur.\n`;
+  if (data.framework?.tailwind) {
+    md += `- 🎯 **Framework Detected:** \`Tailwind CSS\` detected (${data.framework.tailwindClassCount} utilities). You may use Tailwind utility classes corresponding to the design tokens below.\n`;
+  }
+  if (data.radii.length > 0) {
+    md += `- 🎯 **Border Radius System:** Follow the extracted scale: Cards (\`${tok['--radius-md'] || '12px'}\`), Buttons (\`${tok['--radius-sm'] || '6px'}\`).\n`;
+  }
+  if (tok['--backdrop-blur']) {
+    md += `- 🎯 **Glassmorphism:** Apply \`backdrop-filter: ${tok['--backdrop-blur']}\` to elevated cards and navigation bars.\n`;
+  }
+  md += `- 🎯 **Micro-Interactions:** Interactive elements MUST have transitions (\`${tok['--transition-smooth'] || 'all 0.2s ease'}\`) matching the pseudo-states documented below.\n\n`;
 
   // 2. Master CSS Design Tokens (:root block)
   md += `## 2. 🎨 Master CSS Design Tokens (\`:root\` Variables)\n\n`;
@@ -1033,13 +1252,15 @@ function generateUILayoutMD(data) {
   md += `> This provides the exact structural layout of every landmark from top to bottom. Follow this sequence to rebuild the page wireframe.\n\n`;
 
   data.sections.forEach((sec, idx) => {
+    const chunkNum = String(idx + 1).padStart(2, '0');
     md += `### Section ${idx + 1}: ${sec.type}\n`;
-    md += `- **HTML Container:** \`<${sec.tag}>\`${sec.id ? ` id=\`${sec.id}\`` : ''}${sec.classes ? ` class=\`${sec.classes.slice(0, 60)}\`` : ''}\n`;
+    md += `> 📸 **Visual Chunk Reference:** \`screenshots/chunk_${chunkNum}.png\` (crisp 1:1 slice for AI visual inspection)\n\n`;
+    md += `- **HTML Container:** \`<${sec.tag}>\`${sec.id ? ` id=\`${sec.id}\`` : ''}${sec.classes ? ` class=\`${sec.classes.slice(0, 80)}\`` : ''}\n`;
     md += `- **Dimensions & Position:** ${sec.position.width}px × ${sec.position.height}px (starts at y=${sec.position.top}px)\n`;
 
     const styleEntries = Object.entries(sec.style);
     if (styleEntries.length > 0) {
-      md += `- **Key Styles:**\n\`\`\`css\n`;
+      md += `- **Key Styles & Positioning:**\n\`\`\`css\n`;
       styleEntries.forEach(([k, v]) => {
         const cssProp = k.replace(/([A-Z])/g, '-$1').toLowerCase();
         md += `${cssProp}: ${v};\n`;
@@ -1052,13 +1273,13 @@ function generateUILayoutMD(data) {
     }
     md += `- **Direct Child Elements:** ${sec.childCount} elements\n`;
 
-    if (sec.content.headings.length > 0) {
-      md += `- **Headings:**\n`;
-      sec.content.headings.forEach(h => { md += `  - \`<${h.tag}>\`: "${h.text}"\n`; });
+    if (sec.domSkeleton) {
+      md += `\n#### 🧱 Asli DOM Tree Skeleton (Structural Blueprint)\n\`\`\`html\n${sec.domSkeleton}\n\`\`\`\n`;
     }
-    if (sec.content.paragraphs.length > 0) {
-      md += `- **Body Text Sample:**\n`;
-      sec.content.paragraphs.forEach(p => { md += `  - "${p}"\n`; });
+
+    if (sec.content.headings.length > 0) {
+      md += `\n- **Headings Detected:**\n`;
+      sec.content.headings.forEach(h => { md += `  - \`<${h.tag}>\`: "${h.text}"\n`; });
     }
     if (sec.content.buttons.length > 0) {
       md += `- **Buttons & CTAs:**\n`;

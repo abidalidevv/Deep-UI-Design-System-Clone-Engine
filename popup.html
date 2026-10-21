@@ -145,13 +145,44 @@
             <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
             <line x1="12" y1="22.08" x2="12" y2="12"/>
           </svg>
-          <span>Copy Antigravity Master Prompt</span>
+          <span>Copy AI Master Prompt</span>
         </button>
 
         <button id="downloadFullMdBtn" class="btn-master-full" title="Download combined All-in-One spec">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
           <span>Full Spec</span>
         </button>
+      </div>
+
+      <!-- Visual Capture & Clone Bundle Row -->
+      <div class="bundle-action-row">
+        <button id="captureScreenshotBtn" class="btn-capture-ss" title="Capture crisp 1:1 individual viewport slices (no blur)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+          <span id="captureSsText">📸 Visual Chunks (.zip)</span>
+        </button>
+
+        <button id="downloadZipBundleBtn" class="btn-download-zip" title="Download ZIP bundle: DESIGN.md + UI.md + Screenshot + Prompt">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+            <polyline points="7.5 4.21 12 6.81 16.5 4.21"/>
+            <polyline points="7.5 19.79 7.5 14.6 3 12"/>
+            <polyline points="21 12 16.5 14.6 16.5 19.79"/>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+            <line x1="12" y1="22.08" x2="12" y2="12"/>
+          </svg>
+          <span>📦 Clone ZIP Bundle</span>
+        </button>
+      </div>
+
+      <!-- Live Progress Bar (During Screenshot Capture) -->
+      <div id="captureProgressContainer" class="capture-progress-container hidden">
+        <div class="progress-bar-track">
+          <div id="captureProgressBar" class="progress-bar-fill"></div>
+        </div>
+        <div id="captureProgressStatus" class="progress-status-text">Capturing visual chunks...</div>
       </div>
     </div>
 
@@ -212,6 +243,7 @@
     <div id="toast" class="toast">Copied to clipboard</div>
   </div>
 
+  <script src="jszip.min.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

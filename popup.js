@@ -20,6 +20,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   try {
+    // 0. Pre-scroll page down & up to mount lazy-loaded DOM sections & SPAs
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: async () => {
+          const orig = window.scrollY;
+          window.scrollTo({ top: document.body.scrollHeight / 2, behavior: 'instant' });
+          await new Promise(r => setTimeout(r, 60));
+          window.scrollTo({ top: document.body.scrollHeight, behavior: 'instant' });
+          await new Promise(r => setTimeout(r, 60));
+          window.scrollTo({ top: orig, behavior: 'instant' });
+        }
+      });
+    } catch (e) {}
+
     // 1. Inject extraction engine
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
@@ -330,3 +345,316 @@ document.getElementById('copyActivePreviewBtn')?.addEventListener('click', () =>
     copyToClipboard(fullMarkdown, 'FULL_CLONE.md copied!');
   }
 });
+
+// ─── VISUAL SCREENSHOT & ZIP BUNDLE ENGINE ───
+
+function setCaptureProgress(percent, statusText) {
+  const container = document.getElementById('captureProgressContainer');
+  const bar = document.getElementById('captureProgressBar');
+  const text = document.getElementById('captureProgressStatus');
+  if (!container || !bar || !text) return;
+  container.classList.remove('hidden');
+  bar.style.width = `${Math.min(100, Math.max(0, percent))}%`;
+  text.textContent = statusText;
+}
+
+function hideCaptureProgress() {
+  const container = document.getElementById('captureProgressContainer');
+  if (container) container.classList.add('hidden');
+}
+
+function dataUrlToBlob(dataUrl) {
+  const parts = dataUrl.split(',');
+  const mime = parts[0].match(/:(.*?);/)[1];
+  const bstr = atob(parts[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new Blob([u8arr], { type: mime });
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  showToast(`Downloaded ${filename}!`);
+}
+
+async function captureFullPageScreenshot(tab) {
+  setCaptureProgress(5, 'Analyzing page geometry...');
+
+  // 1. Measure dimensions in target tab
+  const [infoResult] = await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    func: () => {
+      const origScrollY = window.scrollY;
+      const origScrollX = window.scrollX;
+      const body = document.body;
+      const html = document.documentElement;
+
+      const totalHeight = Math.max(
+        body.scrollHeight, html.scrollHeight,
+        body.offsetHeight, html.offsetHeight,
+        body.clientHeight, html.clientHeight
+      );
+      const totalWidth = Math.max(
+        body.scrollWidth, html.scrollWidth,
+        window.innerWidth
+      );
+      const viewportHeight = window.innerHeight;
+      const viewportWidth = window.innerWidth;
+      const dpr = window.devicePixelRatio || 1;
+
+      return {
+        totalHeight,
+        totalWidth,
+        viewportHeight,
+        viewportWidth,
+        dpr,
+        origScrollX,
+        origScrollY
+      };
+    }
+  });
+
+  if (!infoResult || !infoResult.result) {
+    throw new Error('Could not calculate page dimensions');
+  }
+
+  const {
+    totalHeight,
+    totalWidth,
+    viewportHeight,
+    viewportWidth,
+    dpr,
+    origScrollX,
+    origScrollY
+  } = infoResult.result;
+
+  const numSteps = Math.max(1, Math.ceil(totalHeight / viewportHeight));
+  const rawChunks = [];
+
+  try {
+    for (let step = 0; step < numSteps; step++) {
+      const scrollY = (step === numSteps - 1 && numSteps > 1)
+        ? Math.max(0, totalHeight - viewportHeight)
+        : step * viewportHeight;
+
+      setCaptureProgress(
+        Math.round((step / numSteps) * 75) + 5,
+        `Capturing crisp slice ${step + 1} of ${numSteps}...`
+      );
+
+      // Scroll and hide sticky header on chunks > 0
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        args: [scrollY, step],
+        func: (y, stepIndex) => {
+          window.scrollTo({ top: y, left: 0, behavior: 'instant' });
+          if (stepIndex > 0) {
+            if (!window.__design2md_hidden_fixed) {
+              window.__design2md_hidden_fixed = [];
+              document.querySelectorAll('*').forEach(el => {
+                const style = window.getComputedStyle(el);
+                if (style.position === 'fixed' || style.position === 'sticky') {
+                  const rect = el.getBoundingClientRect();
+                  if (rect.top <= 120 && rect.height < 200) {
+                    window.__design2md_hidden_fixed.push({ el, origVis: el.style.visibility });
+                    el.style.visibility = 'hidden';
+                  }
+                }
+              });
+            }
+          }
+        }
+      });
+
+      // Brief pause for lazy load images / repaint
+      await new Promise(r => setTimeout(r, 260));
+
+      // Capture visible tab chunk at native resolution
+      const dataUrl = await new Promise((resolve, reject) => {
+        chrome.tabs.captureVisibleTab(null, { format: 'png' }, (res) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else if (!res) {
+            reject(new Error('Empty capture received'));
+          } else {
+            resolve(res);
+          }
+        });
+      });
+
+      rawChunks.push({ dataUrl, y: scrollY, step });
+    }
+  } finally {
+    // Always restore page scroll & sticky headers
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      args: [origScrollX, origScrollY],
+      func: (origX, origY) => {
+        window.scrollTo({ top: origY, left: origX, behavior: 'instant' });
+        if (window.__design2md_hidden_fixed) {
+          window.__design2md_hidden_fixed.forEach(item => {
+            item.el.style.visibility = item.origVis;
+          });
+          delete window.__design2md_hidden_fixed;
+        }
+      }
+    });
+  }
+
+  // Convert each chunk to an individual high-res PNG Blob (no downscaling mush!)
+  const chunkList = rawChunks.map((chunk, i) => {
+    const filename = `chunk_${String(i + 1).padStart(2, '0')}.png`;
+    return {
+      step: chunk.step,
+      filename,
+      blob: dataUrlToBlob(chunk.dataUrl),
+      dataUrl: chunk.dataUrl,
+      y: chunk.y
+    };
+  });
+
+  // 2. Stitch chunks onto Canvas for optional master overview
+  setCaptureProgress(82, 'Generating master stitched preview...');
+
+  let canvasDpr = dpr;
+  if (totalHeight * canvasDpr > 16384) {
+    canvasDpr = Math.min(1.0, 16384 / totalHeight);
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(viewportWidth * canvasDpr);
+  canvas.height = Math.round(totalHeight * canvasDpr);
+  const ctx = canvas.getContext('2d');
+
+  for (let i = 0; i < rawChunks.length; i++) {
+    const chunk = rawChunks[i];
+    const img = new Image();
+    img.src = chunk.dataUrl;
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+    });
+
+    const destY = Math.round(chunk.y * canvasDpr);
+    const destHeight = Math.round(viewportHeight * canvasDpr);
+    ctx.drawImage(img, 0, 0, img.width, img.height, 0, destY, canvas.width, destHeight);
+  }
+
+  setCaptureProgress(94, 'Encoding stitched image...');
+  const stitchedBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+  
+  return {
+    chunks: chunkList,
+    stitchedBlob
+  };
+}
+
+// 8. Capture Crisp Visual Chunks
+document.getElementById('captureScreenshotBtn')?.addEventListener('click', async () => {
+  const btn = document.getElementById('captureScreenshotBtn');
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab || !tab.id) return;
+
+  btn.disabled = true;
+  try {
+    const captureResult = await captureFullPageScreenshot(tab);
+    setCaptureProgress(98, 'Packaging crisp visual chunks...');
+    const domain = extractedData?.meta?.domain?.replace(/[^a-zA-Z0-9]/g, '_') || 'site';
+
+    if (captureResult.chunks.length === 1) {
+      downloadBlob(captureResult.chunks[0].blob, `${domain}_chunk_01.png`);
+    } else {
+      const zip = new JSZip();
+      captureResult.chunks.forEach(c => {
+        zip.file(c.filename, c.blob);
+      });
+      if (captureResult.stitchedBlob) {
+        zip.file('FULL_STITCHED_OVERVIEW.png', captureResult.stitchedBlob);
+      }
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      downloadBlob(zipBlob, `${domain}_VISUAL_CHUNKS.zip`);
+    }
+
+    setCaptureProgress(100, 'Chunks Ready!');
+    setTimeout(() => hideCaptureProgress(), 1800);
+  } catch (err) {
+    console.error('Screenshot capture failed:', err);
+    showToast(`Screenshot failed: ${err.message}`);
+    hideCaptureProgress();
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// 9. Download Complete Clone ZIP Bundle (DESIGN.md + UI.md + screenshots/ + PROMPT)
+document.getElementById('downloadZipBundleBtn')?.addEventListener('click', async () => {
+  const btn = document.getElementById('downloadZipBundleBtn');
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab || !tab.id) return;
+
+  if (typeof JSZip === 'undefined') {
+    showToast('ZIP library loading error');
+    return;
+  }
+
+  btn.disabled = true;
+  try {
+    // Step A: Capture visual chunks
+    const captureResult = await captureFullPageScreenshot(tab);
+
+    // Step B: Build AI Master prompt
+    setCaptureProgress(96, 'Bundling files into ZIP archive...');
+    const promptMatch = fullMarkdown.match(/## 🤖 Antigravity \/ AI Coding Prompt[\s\S]*?```text([\s\S]*?)```/)
+      || designMarkdown.match(/## 🤖 Antigravity \/ AI Coding Prompt[\s\S]*?```text([\s\S]*?)```/);
+    const promptText = promptMatch ? promptMatch[1].trim() : (designMarkdown || fullMarkdown);
+
+    const domain = extractedData?.meta?.domain?.replace(/[^a-zA-Z0-9]/g, '_') || 'site';
+
+    // Step C: Package ZIP with JSZip
+    const zip = new JSZip();
+    const folderName = `${domain}_Clone_Bundle`;
+    const folder = zip.folder(folderName);
+
+    folder.file('DESIGN.md', designMarkdown || '# DESIGN.md\n');
+    folder.file('UI.md', uiMarkdown || '# UI.md\n');
+    folder.file('FULL_CLONE.md', fullMarkdown || '# FULL_CLONE.md\n');
+    folder.file('AI_CODING_PROMPT.txt', promptText || 'Rebuild this site matching DESIGN.md and UI.md');
+
+    // Add screenshots directory with INDIVIDUAL CRISP CHUNKS!
+    const ssFolder = folder.folder('screenshots');
+    captureResult.chunks.forEach(c => {
+      ssFolder.file(c.filename, c.blob);
+    });
+    if (captureResult.stitchedBlob) {
+      ssFolder.file('FULL_STITCHED_PAGE.png', captureResult.stitchedBlob);
+    }
+
+    setCaptureProgress(99, 'Generating ZIP package...');
+    const zipBlob = await zip.generateAsync({
+      type: 'blob',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 6 }
+    });
+
+    setCaptureProgress(100, 'Clone Bundle Ready!');
+    downloadBlob(zipBlob, `${domain}_COMPLETE_CLONE_BUNDLE.zip`);
+    setTimeout(() => hideCaptureProgress(), 2000);
+  } catch (err) {
+    console.error('ZIP bundle generation failed:', err);
+    showToast(`Bundle failed: ${err.message}`);
+    hideCaptureProgress();
+  } finally {
+    btn.disabled = false;
+  }
+});
+
