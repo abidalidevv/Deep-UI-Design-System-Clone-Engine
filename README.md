@@ -1,124 +1,198 @@
-# 🚀 Design2MD Pro — UI & Design Clone Engine
+# 🚀 Design2MD Pro v2.1 — Deep UI & Design System Clone Engine
 
 <div align="center">
 
+[![Release](https://img.shields.io/badge/Release-v2.1%20Enterprise-635BFF?style=for-the-badge&logo=stripe&logoColor=white)](https://github.com/abidalidevv/Deep-UI-Design-System-Clone-Engine/releases)
 [![Manifest V3](https://img.shields.io/badge/Chrome%20Extension-Manifest%20V3-blue?style=for-the-badge&logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/mv3/intro/)
-[![AI Ready](https://img.shields.io/badge/AI%20Ready-Antigravity%20•%20Cursor%20•%20Claude-8B5CF6?style=for-the-badge&logo=openai&logoColor=white)](https://github.com/abidalidevv/Deep-UI-Design-System-Clone-Engine)
+[![AI Ready](https://img.shields.io/badge/AI%20Ready-Antigravity%20•%20Cursor%20•%20Claude-00D4FF?style=for-the-badge&logo=openai&logoColor=white)](https://github.com/abidalidevv/Deep-UI-Design-System-Clone-Engine)
 [![License: MIT](https://img.shields.io/badge/License-MIT-10B981?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
-**Clone any website's visual design system (`DESIGN.md`) and section wireframe (`UI.md`) into production-ready specifications for Antigravity, Cursor, Claude, and AI coding assistants.**
+**Deep-clone any website's visual design system (`DESIGN.md`), section wireframe (`UI.md`), and native-resolution visual screenshot slices (`screenshots/`) into production-ready specifications for Antigravity, Cursor, Claude, and AI coding assistants.**
 
-[Features](#-key-features) • [Installation](#-quick-installation-15-seconds) • [How to Use](#-how-to-use) • [Why Design2MD?](#-why-design2md-solves-the-generic-ai-look) • [AI Prompting](#-prompting-ai-assistants)
+[⚡ Quick Overview](#-why-design2md-pro) • [📦 Installation](#-installation-guide-15-seconds) • [📖 How to Use](#-how-to-use-step-by-step-guide) • [🇵🇰 اردو گائیڈ (Roman Urdu)](#-urdu--roman-urdu-guide-istimaal-karne-ka-tareeqa) • [🤖 Prompting AI](#-how-to-prompt-ai-assistants) • [✨ What's New in v2.1](#-whats-new-in-release-v21)
 
 </div>
 
 ---
 
-## ⚡ Why Design2MD? (Solves the "Generic AI Look")
+## ⚡ Why Design2MD Pro? (The Anti-AI Template Engine)
 
-When AI coding assistants build websites from scratch, they almost always produce flat, generic-looking templates with default blue buttons, un-tracked typography, and basic layouts.
+When AI coding assistants (like Antigravity, Cursor, or Claude) build web applications from a simple prompt, they almost always produce generic, flat templates with saturated blue buttons, un-tracked default typography, and boxy wireframes.
 
-**Design2MD completely eliminates the "generic AI look"** by extracting the exact design tokens and section rhythms of high-production websites (like Stripe, Linear, Vercel, Apple):
+**Design2MD Pro completely eliminates the "generic AI look"** by extracting the exact design tokens, DOM skeletons, and visual rhythms of world-class flagship websites (such as **Stripe**, **Linear**, **Apple**, and **Vercel**):
 
 ```
 Target Website (e.g., Stripe / Linear)
                  │
-                 ▼  (1-Click Scan via Design2MD)
-  ┌──────────────────────────────┬──────────────────────────────┐
+                 ▼  (1-Click Scan via Design2MD Pro)
+  ┌──────────────────────────────┼──────────────────────────────┐
   │                              │                              │
   ▼                              ▼                              ▼
-🎨 DESIGN.md                   📐 UI.md                   🤖 AI Master Prompt
-• Master :root CSS tokens      • Top-to-bottom page rhythm    • Ready-to-paste prompt
-• Semantic Color Palette       • Section-by-section layout    • Directs Antigravity to
-• Typography Scale & Fonts     • Bento grid wireframes          replicate the exact
-• Anti-AI Quality Directives   • HTML & CSS component code      aesthetic & depth
+🎨 DESIGN.md                   📐 UI.md                   📸 Visual Chunks & ZIP
+• Master :root CSS tokens      • Executive Page Rhythm Map    • 1:1 Crisp Viewport Slices
+• Exact Palette (Surfaces,     • Asli DOM Tree Skeletons      • Zero Downscaling Blur
+  Text, Borders, Accents)        with placeholder tags        • Complete ZIP Archive
+• Typography Hierarchy &       • Flexbox, Grid, & Layering      (DESIGN + UI + Slices +
+  Letter-Spacing Scale           (z-index, overflow, max-width) Prompt)
 ```
 
 ---
 
-## 💎 Two Modular Specifications: `DESIGN.md` vs `UI.md`
+## 💎 The Four Output Artifacts Explained
 
-| Feature | 🎨 `DESIGN.md` *(Tokens & Style)* | 📐 `UI.md` *(Sections & Wireframe)* | 📸 `Visual Chunks` & 📦 `ZIP Bundle` |
-| :--- | :--- | :--- | :--- |
-| **Best For** | Applying this website's **aesthetic & colors** to your own app or tool. | Cloning the **exact page layout, sections & structure** of the website. | Feeding **individual crisp section screenshots** + **code context** to Multimodal AI without token downscaling blur! |
-| **Contents** | • Synthesized `:root` CSS variables<br>• Complete Color Palette (Surfaces, Text, Borders)<br>• Typography hierarchy (`H1` to `P`) & Font features<br>• Component pseudo-states (`:hover`, `:focus`) from CSS<br>• Tailwind CSS utility class detection<br>• Mathematical spacing grid (4px/8px) | • **Executive Page Rhythm Map** (Sequence & heights)<br>• **Asli DOM Tree Skeleton** per section with structural placeholders (`[Heading]`, `[Paragraph]`, `[Image]`)<br>• Direct mapping to `screenshots/chunk_XX.png`<br>• Exact flexbox, grid, z-index, & positioning rules | • **Crisp Viewport Slices (.png)** captured chunk-by-chunk at native 1080p/2K resolution.<br>• Eliminates IDE downscaling blur (no 16,000px mush!).<br>• **📦 Clone ZIP Bundle** bundling `DESIGN.md`, `UI.md`, `FULL_CLONE.md`, `AI_CODING_PROMPT.txt`, and a dedicated `screenshots/` directory with all section chunks. |
-| **Export Action** | 📥 **Download DESIGN.md** or copy `:root CSS` | 📥 **Download UI.md** or copy sections wireframe | 📸 **Visual Chunks (.zip)** or 📦 **Clone ZIP Bundle** |
+| Artifact | File Name | What It Contains | When To Use It |
+|---|---|---|---|
+| 🎨 **Design Tokens Spec** | `[domain]_DESIGN.md` | Master `:root` CSS variables, exact color palette, typography hierarchy, font feature settings, component pseudo-states (`:hover`, `:focus`), and mathematical spacing scale. | When you want your website or dashboard to have the **exact colors, fonts, buttons, and visual styling** of the target site. |
+| 📐 **UI Wireframe Spec** | `[domain]_UI.md` | Executive page rhythm map (section heights and order), **Asli DOM Tree Skeletons** per section, layout coordinates, flex/grid rules, and content placeholders. | When you want to clone the **exact page layout, section order, bento grids, and container structure**. |
+| 📸 **Crisp Visual Slices** | `[domain]_VISUAL_CHUNKS.zip` | High-resolution individual viewport PNG slices (`chunk_01.png`, `chunk_02.png`, etc.) captured slice-by-slice at native display resolution. | When providing screenshots to Multimodal AI (Antigravity/Claude). **Prevents blurry downscaling** caused by 19,000px stitched images! |
+| 📦 **All-In-One Bundle** | `[domain]_COMPLETE_CLONE_BUNDLE.zip` | Complete package: `DESIGN.md` + `UI.md` + `FULL_CLONE.md` + `AI_CODING_PROMPT.txt` + `screenshots/` directory containing all chunks. | The ultimate 1-click download. Drop this folder directly into your workspace or AI prompt! |
 
 ---
 
-## 🚀 Quick Installation (15 Seconds)
+## 📦 Installation Guide (15 Seconds)
 
-Works in **Google Chrome**, **Brave**, **Arc**, and **Microsoft Edge**:
+Compatible with **Google Chrome**, **Brave**, **Arc**, **Microsoft Edge**, and all Chromium browsers:
 
-1. Open your browser and navigate to:
+1. **Download or Clone the Repository:**
+   ```bash
+   git clone https://github.com/abidalidevv/Deep-UI-Design-System-Clone-Engine.git
+   ```
+   *(or download the ZIP and extract it to your preferred folder).*
+
+2. **Open Extensions Manager:**
+   In your Chrome browser URL bar, type:
    ```text
    chrome://extensions/
    ```
-2. In the top-right corner, toggle **ON** **"Developer mode"**.
-3. In the top-left corner, click **"Load unpacked"**.
-4. Select the extension directory:
-   ```text
-   C:\Users\Ali\Desktop\clone ui\Deep-UI-Design-System-Clone-Engine
-   ```
-   *(or `C:\Users\Ali\.gemini\antigravity-ide\scratch\ui-spec-extractor-extension`)*
-5. **Done!** Click the puzzle icon in Chrome and **pin Design2MD Pro** to your toolbar for instant 1-click access.
+
+3. **Enable Developer Mode:**
+   Toggle **ON** the switch labeled **"Developer mode"** in the top-right corner.
+
+4. **Load the Extension:**
+   - Click **"Load unpacked"** in the top-left corner.
+   - Select the folder:
+     ```text
+     C:\Users\Ali\Desktop\clone ui\Deep-UI-Design-System-Clone-Engine
+     ```
+   - Click **Select Folder**.
+
+5. **Pin to Toolbar:**
+   Click the puzzle piece icon in your Chrome toolbar and **pin Design2MD Pro** for instant 1-click access.
 
 ---
 
-## 🎯 How to Use
+## 📖 How to Use (Step-by-Step Guide)
 
-1. Navigate to **any webpage** whose design or layout you admire (e.g. `stripe.com`, `linear.app`, `vercel.com`, `apple.com`).
-2. Click the **Design2MD Pro** toolbar icon.
-3. The popup automatically pre-scrolls to mount lazy sections, scans the page, and displays:
-   - **Active Target:** Site domain, page title, and Dark/Light mode detection.
-   - **Dual Export Hub:** Dedicated buttons for `DESIGN.md` and `UI.md`.
-   - **Visual Capture Hub:** `📸 Visual Chunks (.zip)` and `📦 Clone ZIP Bundle`.
-   - **Interactive Tabs:** Clickable color swatches (with hex copy), typography scale, vertical sections timeline, and component specs.
-4. Export with 1 click:
-   - 🎨 Click **"Download DESIGN.md"** for design tokens and CSS variables.
-   - 📐 Click **"Download UI.md"** for sections and real DOM wireframe skeletons.
-   - 📸 Click **"Visual Chunks (.zip)"** to download individual native-res section slices.
-   - 📦 Click **"Clone ZIP Bundle"** to download all specs + AI prompt + `screenshots/` folder in one complete ZIP archive.
-   - 🤖 Click **"Copy Antigravity Master Prompt"** for the ready-to-paste AI prompt.
+### Workflow 1: Inspecting & Cloning a Live Website
+
+1. **Open the Website:**
+   Navigate to any website you want to clone or draw inspiration from (e.g., [stripe.com/payments](https://stripe.com/payments) or [linear.app](https://linear.app)).
+2. **Open Design2MD Pro:**
+   Click the Design2MD Pro icon in your browser toolbar.
+3. **Instant Scan:**
+   The extension will automatically pre-scroll to mount lazy sections, inspect the DOM tree, and render the **Stripe Enterprise Light Dashboard**.
+4. **Choose Your Export:**
+   - **Click "Download DESIGN.md ›"**: Downloads the design tokens and `:root` CSS.
+   - **Click "Download UI.md ›"**: Downloads the page wireframe and DOM tree skeletons.
+   - **Click "Visual Chunks (.zip) ›"**: Takes crisp, 1:1 viewport slices and bundles them into a zip file.
+   - **Click "Clone ZIP Bundle ›"**: Packages all markdown specifications, master prompt, and screenshot chunks into a single ready-to-use archive.
+   - **Click "Copy AI Master Prompt ›"**: Copies the prompt directly to your clipboard.
 
 ---
 
-## 🤖 Prompting AI Assistants (Antigravity, Cursor, Claude)
+### Workflow 2: Standalone Interactive Browser Mode
 
-When creating or modifying your web application, provide the generated markdown file to your AI assistant:
+You can also open `popup.html` directly in your browser:
+```text
+file:///C:/Users/Ali/Desktop/clone ui/Deep-UI-Design-System-Clone-Engine/popup.html
+```
+- The extension **self-hydrates** with a high-fidelity **Stripe Payments demo dataset**.
+- Explore all 5 interactive tabs:
+  - **Palette:** Click any color swatch to copy its Hex code.
+  - **Type:** View primary fonts (`Söhne`, `Plus Jakarta Sans`) and typography sizes (`H1` to `<button>`).
+  - **Sections:** View detected landmark containers and heights.
+  - **Comps:** Inspect navbar, buttons, and floating glass cards.
+  - **Preview:** Read and copy live `DESIGN.md` and `UI.md` code.
+
+---
+
+## 🇵🇰 Urdu / Roman Urdu Guide (Istimaal Karne Ka Tareeqa)
+
+### Step 1: Extension Install Karein
+1. Chrome mein `chrome://extensions` open karein.
+2. Top-right corner se **"Developer mode"** ON karein.
+3. Top-left se **"Load unpacked"** par click karein aur ye folder select karein:
+   `C:\Users\Ali\Desktop\clone ui\Deep-UI-Design-System-Clone-Engine`
+4. Toolbar mein puzzle icon se **Design2MD Pro** ko pin kar lein.
+
+### Step 2: Kisi Bhi Website Ka Design Scan Karein
+1. Jo website aapko pasand ho (jaise `stripe.com` ya `linear.app`), usay Chrome mein open karein.
+2. Chrome toolbar se **Design2MD icon** par click karein.
+3. Extension automatically page ko micro-scroll karke live DOM aur styling read kar legi.
+
+### Step 3: Files Export Karein
+- **🎨 Download DESIGN.md:** Is file mein saare colors, fonts, `:root` CSS variables, aur button hover states hote hain.
+- **📐 Download UI.md:** Is file mein page ke saare sections ka structure (Hero, Bento Grid, Cards) aur **Asli DOM Skeleton** hota hai.
+- **📸 Visual Chunks (.zip):** Lamba blurry screenshot lene ke bajaye page ko **1:1 crisp slices** mein kaat kar zip karta hai jo AI asaani se samajh sakti hai.
+- **📦 Clone ZIP Bundle:** Ek hi click par `DESIGN.md`, `UI.md`, `FULL_CLONE.md`, `AI_CODING_PROMPT.txt`, aur `screenshots/` folder ko zip mein download karta hai.
+- **🤖 Copy AI Master Prompt:** Antigravity / Cursor ke liye tayyar prompt copy karta hai.
+
+### Step 4: AI Ko Kaise Dena Hai?
+AI assistant (Antigravity / Cursor) ko ye prompt dein aur sath files attach karein:
+> *"Attached DESIGN.md aur UI.md ke mutabiq meri application ka frontend build karo. Colors aur pill buttons ka radius bilkul same hona chahiye."*
+
+---
+
+## 🤖 How to Prompt AI Assistants (Antigravity, Cursor, Claude)
+
+When prompting your AI assistant, pass the extracted markdown files and prompt:
 
 ```text
-Build my web application using the exact visual aesthetic and design system 
-described in the attached DESIGN.md.
+Build my web application using the exact visual aesthetic, color tokens, and layout 
+defined in the attached DESIGN.md and UI.md specifications.
 
-Follow the section sequence and component structures from UI.md.
-Strictly adhere to the synthesized :root CSS variables, typography letter-spacing,
-1px card border highlights, and hover micro-interactions.
+Mandatory Quality Rules:
+1. Palette: Use ONLY the synthesized :root CSS variables from DESIGN.md.
+2. Pill Buttons: Primary buttons must use border-radius: 9999px with inset light bevels 
+   and smooth hover lifts.
+3. Floating Cards: Cards must use 16px border-radius with subtle 1px hairline borders 
+   and diffused elevation shadows.
+4. Structure: Recreate the section rhythm and DOM skeleton layout from UI.md.
+5. Zero Generic AI Look: Do NOT use default saturated blues (#2563EB) or un-tracked headings.
 ```
 
-Your AI-generated website will look indistinguishable from a top-tier designer's work — with **zero generic AI template feel**!
+---
+
+## ✨ What's New in Release v2.1
+
+- 🎨 **Authentic Stripe Enterprise Light Theme:** Redesigned from the ground up with Stripe's luminous ambient pastel mesh background, pill capsule buttons (`border-radius: 9999px`), inset glass light-bevels, and floating translucent Zenflow cards.
+- 📸 **Visual Chunking Engine:** Captures native 1080p/2K viewport slices (`chunk_01.png`, `chunk_02.png`) to solve the multimodal token downscaling blur problem.
+- 🛡️ **Mega-Height Memory Safeguard:** Added memory-safe canvas allocation guards so 19,000px pages (like Stripe) capture flawlessly without memory crashes.
+- 🧱 **Real Trimmed DOM Tree Skeletons:** Extracts true DOM hierarchy while stripping out raw content and replacing with semantic placeholders (`[Heading]`, `[Paragraph]`, `[Image]`).
+- ⚡ **Dual-Mode Interactive Architecture:** Extension operates in both dynamic live extraction mode and standalone self-hydrating demo mode.
+- 🎯 **Interactive Stripe Chevrons (`›`):** Refined button micro-interactions with animated right-pointing arrows.
 
 ---
 
 ## 🛠️ Project Structure
 
-```
-├── manifest.json       # Chrome Extension Manifest V3 configuration
-├── popup.html          # Ultra-luxury popup interface (Raycast / Linear aesthetic)
-├── popup.css           # Premium glassmorphic styling, obsidian theme & animations
-├── popup.js            # Controller: dual markdown generators, tab manager & clipboard helpers
-├── extractor.js        # v3.0 Deep Web Design Clone Engine (DOM analysis & token synthesis)
+```text
+Deep-UI-Design-System-Clone-Engine/
+├── manifest.json       # Chrome Extension Manifest V3 configuration (v2.1.0)
+├── popup.html          # Stripe Enterprise Light popup interface
+├── popup.css           # Authentic Stripe design system, ambient mesh & pill styles
+├── popup.js            # Controller: dual-mode engine, chunking & zip packager
+├── extractor.js        # v2.5 Deep DOM inspection, skeleton parser & token synthesizer
+├── jszip.min.js        # Client-side ZIP archive bundler
 ├── icons/              # Extension icons (16px, 48px, 128px)
-└── README.md           # Documentation
+└── README.md           # Master Documentation & User Guide
 ```
 
 ---
 
 ## 📄 License
 
-Distributed under the **MIT License**. Free for personal and commercial use.
-
----
+Distributed under the **MIT License**. Free for personal and commercial projects.
 
 <div align="center">
 Built with ❤️ by <a href="https://github.com/abidalidevv">abidalidevv</a>
