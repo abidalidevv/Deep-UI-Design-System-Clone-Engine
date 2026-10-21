@@ -34,26 +34,8 @@ async function initPopup() {
   }
 
   try {
-    // 0. Progressive hydration sweep to mount lazy animations, IntersectionObservers, and SPAs
-    try {
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: async () => {
-          const orig = window.scrollY;
-          const totalH = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
-          const vh = window.innerHeight || 800;
-          const steps = Math.min(10, Math.max(4, Math.ceil(totalH / vh)));
-          for (let i = 1; i <= steps; i++) {
-            const y = Math.min(totalH, (i / steps) * totalH);
-            window.scrollTo({ top: y, behavior: 'instant' });
-            await new Promise(r => setTimeout(r, 120));
-          }
-          await new Promise(r => setTimeout(r, 180));
-          window.scrollTo({ top: orig, behavior: 'instant' });
-          await new Promise(r => setTimeout(r, 100));
-        }
-      });
-    } catch (e) {}
+    // 0. Deep hydration sweep: mounts lazy animations, forces eager image loading, wakes IntersectionObservers
+    await performDeepPageHydration(tab.id);
 
     // 1. Inject extraction engine
     await chrome.scripting.executeScript({
@@ -657,11 +639,107 @@ function downloadBlob(blob, filename) {
   showToast(`Downloaded ${filename}!`);
 }
 
-async function captureFullPageScreenshot(tab) {
-  setCaptureProgress(5, 'Analyzing page geometry...');
+// ─── Deep Page Hydration Pass ───
+async function performDeepPageHydration(tabId, onProgress) {
+  if (onProgress) onProgress(10, 'Deep hydrating: waking up animations & lazy assets...');
 
-  // 1. Measure dimensions in target tab
-  const [infoResult] = await chrome.scripting.executeScript({
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: async () => {
+        // 1. Temporarily force visibility on scroll-triggered elements (AOS, Wow, ScrollTrigger, Framer)
+        let animStyle = document.getElementById('__design2md_hydration_style');
+        if (!animStyle) {
+          animStyle = document.createElement('style');
+          animStyle.id = '__design2md_hydration_style';
+          animStyle.textContent = `
+            /* Unhide animation-driven containers */
+            [data-aos], .aos-init, [data-scroll], [data-reveal], .reveal, .fade-in, .animate-on-scroll {
+              opacity: 1 !important;
+              visibility: visible !important;
+              transform: none !important;
+              animation: none !important;
+              transition: none !important;
+            }
+            /* Ensure images and media are visible */
+            img, picture, svg, video {
+              opacity: 1 !important;
+              visibility: visible !important;
+            }
+          `;
+          document.head.appendChild(animStyle);
+        }
+
+        // 2. Force eager loading on all native lazy images/iframes
+        document.querySelectorAll('img[loading="lazy"], iframe[loading="lazy"]').forEach(el => {
+          el.setAttribute('loading', 'eager');
+        });
+
+        // 3. Promote data-src, data-srcset, data-original, data-lazy-src to real attributes
+        document.querySelectorAll('img, picture source').forEach(el => {
+          if (el.dataset.src && !el.src) el.src = el.dataset.src;
+          if (el.dataset.srcset && !el.srcset) el.srcset = el.dataset.srcset;
+          if (el.dataset.original && !el.src) el.src = el.dataset.original;
+          if (el.dataset.lazySrc && !el.src) el.src = el.dataset.lazySrc;
+        });
+
+        // 4. Smooth progressive sweep to trigger all IntersectionObservers and lazy components
+        const totalH = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+        const vh = window.innerHeight || 800;
+        const steps = Math.min(12, Math.max(5, Math.ceil(totalH / vh)));
+
+        for (let i = 1; i <= steps; i++) {
+          const y = Math.min(totalH, (i / steps) * totalH);
+          window.scrollTo({ top: y, behavior: 'instant' });
+          window.dispatchEvent(new Event('scroll'));
+          await new Promise(r => setTimeout(r, 90));
+        }
+
+        // 5. Wait for web fonts
+        if (document.fonts && document.fonts.ready) {
+          try { await document.fonts.ready; } catch(e) {}
+        }
+
+        // 6. Wait for pending images to complete decoding
+        const pendingImages = Array.from(document.images).filter(img => !img.complete && img.src);
+        if (pendingImages.length > 0) {
+          await Promise.race([
+            Promise.all(pendingImages.map(img => {
+              if (img.decode) {
+                return img.decode().catch(() => {});
+              }
+              return new Promise(res => {
+                img.onload = img.onerror = res;
+                setTimeout(res, 1200);
+              });
+            })),
+            new Promise(res => setTimeout(res, 2000))
+          ]);
+        }
+
+        // 7. Settle layout and return to top
+        await new Promise(r => setTimeout(r, 200));
+        window.scrollTo({ top: 0, behavior: 'instant' });
+        window.dispatchEvent(new Event('scroll'));
+        await new Promise(r => setTimeout(r, 150));
+      }
+    });
+  } catch (e) {
+    console.warn('Hydration script warning:', e);
+  }
+
+  if (onProgress) onProgress(25, 'Hydration complete!');
+}
+
+// ─── Smart 5–7 Macro-Chunk Visual Capture Engine ───
+async function captureSmartChunks(tab) {
+  // 1. Deep hydration pass first so all lazy images & animations are 100% mounted
+  setCaptureProgress(5, 'Deep hydrating page (images & animations)...');
+  await performDeepPageHydration(tab.id, (pct, msg) => setCaptureProgress(pct, msg));
+
+  // 2. Measure dimensions in target tab
+  setCaptureProgress(25, 'Calculating 5–7 macro-chunk layout...');
+  const [geomResult] = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
     func: () => {
       const origScrollY = window.scrollY;
@@ -694,8 +772,8 @@ async function captureFullPageScreenshot(tab) {
     }
   });
 
-  if (!infoResult || !infoResult.result) {
-    throw new Error('Could not calculate page dimensions');
+  if (!geomResult || !geomResult.result) {
+    throw new Error('Failed to analyze target page dimensions');
   }
 
   const {
@@ -706,63 +784,142 @@ async function captureFullPageScreenshot(tab) {
     dpr,
     origScrollX,
     origScrollY
-  } = infoResult.result;
+  } = geomResult.result;
 
-  const numSteps = Math.max(1, Math.ceil(totalHeight / viewportHeight));
-  const rawChunks = [];
+  // 3. Determine optimal chunk count: TARGET 5 TO 7 CHUNKS
+  // Short pages (<2 viewports) take 1-3 chunks.
+  // Medium-to-large pages take strictly 5 to 7 macro chunks covering 100% of the page!
+  let numChunks;
+  if (totalHeight <= viewportHeight * 1.5) {
+    numChunks = 1;
+  } else if (totalHeight <= viewportHeight * 3) {
+    numChunks = Math.min(3, Math.ceil(totalHeight / viewportHeight));
+  } else if (totalHeight <= viewportHeight * 5) {
+    numChunks = 5;
+  } else {
+    // For large/enterprise pages (e.g. Stripe Payments), strictly 5 to 7 chunks
+    numChunks = Math.min(7, Math.max(5, Math.round(totalHeight / 2600)));
+  }
+
+  // Calculate slice geometry for each of the N chunks (100% continuous coverage, 0 gaps)
+  const chunkSlices = [];
+  for (let c = 0; c < numChunks; c++) {
+    const top = Math.round(c * (totalHeight / numChunks));
+    const bottom = (c === numChunks - 1) ? totalHeight : Math.round((c + 1) * (totalHeight / numChunks));
+    chunkSlices.push({
+      index: c,
+      chunkNum: String(c + 1).padStart(2, '0'),
+      top,
+      bottom,
+      height: bottom - top
+    });
+  }
+
+  const generatedChunks = [];
 
   try {
-    for (let step = 0; step < numSteps; step++) {
-      const scrollY = (step === numSteps - 1 && numSteps > 1)
-        ? Math.max(0, totalHeight - viewportHeight)
-        : step * viewportHeight;
-
+    for (let c = 0; c < chunkSlices.length; c++) {
+      const slice = chunkSlices[c];
+      const percent = Math.round(30 + ((c / numChunks) * 60));
       setCaptureProgress(
-        Math.round((step / numSteps) * 75) + 5,
-        `Capturing crisp slice ${step + 1} of ${numSteps}...`
+        percent,
+        `Capturing Chunk ${c + 1} of ${numChunks} (${slice.top}px – ${slice.bottom}px)...`
       );
 
-      // Scroll and hide sticky header on chunks > 0
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        args: [scrollY, step],
-        func: (y, stepIndex) => {
-          window.scrollTo({ top: y, left: 0, behavior: 'instant' });
-          if (stepIndex > 0) {
-            if (!window.__design2md_hidden_fixed) {
-              window.__design2md_hidden_fixed = [];
-              document.querySelectorAll('*').forEach(el => {
-                const style = window.getComputedStyle(el);
-                if (style.position === 'fixed' || style.position === 'sticky') {
-                  const rect = el.getBoundingClientRect();
-                  if (rect.top <= 120 && rect.height < 200) {
-                    window.__design2md_hidden_fixed.push({ el, origVis: el.style.visibility });
-                    el.style.visibility = 'hidden';
+      // Determine sub-steps needed to capture this slice
+      const subSteps = Math.max(1, Math.ceil(slice.height / viewportHeight));
+      const subCaptures = [];
+
+      for (let s = 0; s < subSteps; s++) {
+        const scrollY = (s === subSteps - 1 && subSteps > 1)
+          ? Math.max(0, slice.bottom - viewportHeight)
+          : Math.min(Math.max(0, totalHeight - viewportHeight), slice.top + (s * viewportHeight));
+
+        // Scroll to position & hide sticky headers on chunks/slices after the hero
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          args: [scrollY, c],
+          func: (y, chunkIndex) => {
+            window.scrollTo({ top: y, left: 0, behavior: 'instant' });
+            if (chunkIndex > 0) {
+              if (!window.__design2md_hidden_fixed) {
+                window.__design2md_hidden_fixed = [];
+                document.querySelectorAll('*').forEach(el => {
+                  const style = window.getComputedStyle(el);
+                  if (style.position === 'fixed' || style.position === 'sticky') {
+                    const rect = el.getBoundingClientRect();
+                    if (rect.top <= 120 && rect.height < 250) {
+                      window.__design2md_hidden_fixed.push({ el, origVis: el.style.visibility });
+                      el.style.visibility = 'hidden';
+                    }
                   }
-                }
-              });
+                });
+              }
             }
           }
-        }
-      });
-
-      // Brief pause for lazy load images / repaint
-      await new Promise(r => setTimeout(r, 260));
-
-      // Capture visible tab chunk at native resolution
-      const dataUrl = await new Promise((resolve, reject) => {
-        chrome.tabs.captureVisibleTab(null, { format: 'png' }, (res) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-          } else if (!res) {
-            reject(new Error('Empty capture received'));
-          } else {
-            resolve(res);
-          }
         });
-      });
 
-      rawChunks.push({ dataUrl, y: scrollY, step });
+        // Generous settle time for image decode and repaint
+        await new Promise(r => setTimeout(r, 280));
+
+        // Capture visible tab
+        const dataUrl = await new Promise((resolve, reject) => {
+          chrome.tabs.captureVisibleTab(null, { format: 'png' }, (res) => {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+            } else if (!res) {
+              reject(new Error('Empty capture received'));
+            } else {
+              resolve(res);
+            }
+          });
+        });
+
+        subCaptures.push({
+          dataUrl,
+          scrollY,
+          relativeY: scrollY - slice.top
+        });
+      }
+
+      // Merge sub-captures for this slice into a single crisp Chunk PNG
+      if (subCaptures.length === 1 && slice.height <= viewportHeight) {
+        // Direct blob if exactly 1 viewport
+        generatedChunks.push({
+          chunkIndex: c,
+          filename: `chunk_${slice.chunkNum}.png`,
+          blob: dataUrlToBlob(subCaptures[0].dataUrl),
+          dataUrl: subCaptures[0].dataUrl,
+          slice
+        });
+      } else {
+        // Multi-frame slice: Stitch onto a slice canvas at native DPR
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(viewportWidth * dpr);
+        canvas.height = Math.round(slice.height * dpr);
+        const ctx = canvas.getContext('2d');
+
+        for (const sub of subCaptures) {
+          const img = new Image();
+          img.src = sub.dataUrl;
+          await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+
+          const destY = Math.round(sub.relativeY * dpr);
+          const destH = Math.round(viewportHeight * dpr);
+          ctx.drawImage(img, 0, 0, img.width, img.height, 0, destY, canvas.width, destH);
+        }
+
+        const chunkBlob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+        const chunkDataUrl = canvas.toDataURL('image/png');
+
+        generatedChunks.push({
+          chunkIndex: c,
+          filename: `chunk_${slice.chunkNum}.png`,
+          blob: chunkBlob,
+          dataUrl: chunkDataUrl,
+          slice
+        });
+      }
     }
   } finally {
     // Always restore page scroll & sticky headers
@@ -781,61 +938,9 @@ async function captureFullPageScreenshot(tab) {
     });
   }
 
-  // Convert each chunk to an individual high-res PNG Blob
-  const chunkList = rawChunks.map((chunk, i) => {
-    const filename = `chunk_${String(i + 1).padStart(2, '0')}.png`;
-    return {
-      step: chunk.step,
-      filename,
-      blob: dataUrlToBlob(chunk.dataUrl),
-      dataUrl: chunk.dataUrl,
-      y: chunk.y
-    };
-  });
-
-  // 2. Stitch chunks onto Canvas for optional master overview (safeguarded against OOM)
-  setCaptureProgress(82, 'Generating master stitched preview...');
-  let stitchedBlob = null;
-
-  try {
-    let canvasDpr = dpr;
-    if (totalHeight * canvasDpr > 16384) {
-      canvasDpr = Math.min(1.0, 16384 / totalHeight);
-    }
-    const maxDimension = 16384;
-    const targetWidth = Math.min(maxDimension, Math.round(viewportWidth * canvasDpr));
-    const targetHeight = Math.min(maxDimension, Math.round(totalHeight * canvasDpr));
-
-    const canvas = document.createElement('canvas');
-    canvas.width = targetWidth;
-    canvas.height = targetHeight;
-    const ctx = canvas.getContext('2d');
-
-    if (ctx) {
-      for (let i = 0; i < rawChunks.length; i++) {
-        const chunk = rawChunks[i];
-        const img = new Image();
-        img.src = chunk.dataUrl;
-        await new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = reject;
-        });
-
-        const destY = Math.round(chunk.y * canvasDpr);
-        const destHeight = Math.round(viewportHeight * canvasDpr);
-        ctx.drawImage(img, 0, 0, img.width, img.height, 0, destY, canvas.width, destHeight);
-      }
-
-      setCaptureProgress(94, 'Encoding stitched image...');
-      stitchedBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-    }
-  } catch (canvasErr) {
-    console.warn('Stitched canvas generation skipped (page height exceeds memory):', canvasErr);
-  }
-
   return {
-    chunks: chunkList,
-    stitchedBlob
+    chunks: generatedChunks,
+    numChunks
   };
 }
 
@@ -861,8 +966,8 @@ async function handleCaptureScreenshot() {
 
   btn.disabled = true;
   try {
-    const captureResult = await captureFullPageScreenshot(tab);
-    setCaptureProgress(98, 'Packaging crisp visual chunks...');
+    const captureResult = await captureSmartChunks(tab);
+    setCaptureProgress(95, `Packaging ${captureResult.chunks.length} crisp chunks...`);
     const domain = extractedData?.meta?.domain?.replace(/[^a-zA-Z0-9]/g, '_') || 'site';
 
     if (captureResult.chunks.length === 1) {
@@ -872,14 +977,11 @@ async function handleCaptureScreenshot() {
       captureResult.chunks.forEach(c => {
         zip.file(c.filename, c.blob);
       });
-      if (captureResult.stitchedBlob) {
-        zip.file('FULL_STITCHED_OVERVIEW.png', captureResult.stitchedBlob);
-      }
       const zipBlob = await zip.generateAsync({ type: 'blob' });
       downloadBlob(zipBlob, `${domain}_VISUAL_CHUNKS.zip`);
     }
 
-    setCaptureProgress(100, 'Chunks Ready!');
+    setCaptureProgress(100, `Done! ${captureResult.chunks.length} Chunks Saved`);
     setTimeout(() => hideCaptureProgress(), 1800);
   } catch (err) {
     console.error('Screenshot capture failed:', err);
@@ -900,7 +1002,7 @@ async function handleDownloadZipBundle() {
 
   btn.disabled = true;
   try {
-    setCaptureProgress(20, 'Preparing bundle files...');
+    setCaptureProgress(15, 'Preparing bundle specifications...');
     const domain = extractedData?.meta?.domain?.replace(/[^a-zA-Z0-9]/g, '_') || 'stripe_com';
     const zip = new JSZip();
     const folderName = `${domain}_Clone_Bundle`;
@@ -915,28 +1017,25 @@ async function handleDownloadZipBundle() {
     const promptText = promptMatch ? promptMatch[1].trim() : (designMarkdown || fullMarkdown);
     folder.file('AI_CODING_PROMPT.txt', promptText || 'Rebuild this site matching DESIGN.md and UI.md');
 
-    // If running in live website tab, capture screenshots too!
+    // If running in live website tab, capture 5-7 crisp visual chunks too!
     const isExtensionEnv = typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.query;
     if (isExtensionEnv) {
       try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (tab && tab.id && !tab.url?.startsWith('file://') && !tab.url?.startsWith('chrome://')) {
-          setCaptureProgress(40, 'Capturing live visual chunks...');
-          const captureResult = await captureFullPageScreenshot(tab);
+          setCaptureProgress(30, 'Capturing 5–7 visual chunks for bundle...');
+          const captureResult = await captureSmartChunks(tab);
           const ssFolder = folder.folder('screenshots');
           captureResult.chunks.forEach(c => {
             ssFolder.file(c.filename, c.blob);
           });
-          if (captureResult.stitchedBlob) {
-            ssFolder.file('FULL_STITCHED_PAGE.png', captureResult.stitchedBlob);
-          }
         }
       } catch (e) {
         console.warn('Screenshot in zip skipped:', e);
       }
     }
 
-    setCaptureProgress(90, 'Generating ZIP package...');
+    setCaptureProgress(92, 'Generating final ZIP bundle...');
     const zipBlob = await zip.generateAsync({
       type: 'blob',
       compression: 'DEFLATE',

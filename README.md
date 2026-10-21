@@ -44,8 +44,8 @@ Target Website (e.g., Stripe / Linear)
 |---|---|---|---|
 | 🎨 **Design Tokens Spec** | `[domain]_DESIGN.md` | Master `:root` CSS variables, exact color palette, typography hierarchy, font feature settings, component pseudo-states (`:hover`, `:focus`), and mathematical spacing scale. | When you want your website or dashboard to have the **exact colors, fonts, buttons, and visual styling** of the target site. |
 | 📐 **UI Wireframe Spec** | `[domain]_UI.md` | Executive page rhythm map (section heights and order), **Asli DOM Tree Skeletons** per section, layout coordinates, flex/grid rules, and content placeholders. | When you want to clone the **exact page layout, section order, bento grids, and container structure**. |
-| 📸 **Crisp Visual Slices** | `[domain]_VISUAL_CHUNKS.zip` | High-resolution individual viewport PNG slices (`chunk_01.png`, `chunk_02.png`, etc.) captured slice-by-slice at native display resolution. | When providing screenshots to Multimodal AI (Antigravity/Claude). **Prevents blurry downscaling** caused by 19,000px stitched images! |
-| 📦 **All-In-One Bundle** | `[domain]_COMPLETE_CLONE_BUNDLE.zip` | Complete package: `DESIGN.md` + `UI.md` + `FULL_CLONE.md` + `AI_CODING_PROMPT.txt` + `screenshots/` directory containing all chunks. | The ultimate 1-click download. Drop this folder directly into your workspace or AI prompt! |
+| 📸 **Smart 5–7 Visual Chunks** | `[domain]_VISUAL_CHUNKS.zip` | Exactly **5 to 7 crisp, high-resolution macro slices** (`chunk_01.png` to `chunk_07.png`) covering 100% of the page top-to-bottom. | When providing screenshots to Multimodal AI (Antigravity/Claude). **Eliminates blurry downscaled 19,000px monster screenshots** while maintaining 100% page coverage! |
+| 📦 **All-In-One Bundle** | `[domain]_COMPLETE_CLONE_BUNDLE.zip` | Complete package: `DESIGN.md` + `UI.md` + `FULL_CLONE.md` + `AI_CODING_PROMPT.txt` + `screenshots/` directory containing all 5–7 chunks. | The ultimate 1-click download. Drop this folder directly into your workspace or AI prompt! |
 
 ---
 
@@ -133,8 +133,8 @@ file:///C:/Users/Ali/Desktop/clone ui/Deep-UI-Design-System-Clone-Engine/popup.h
 ### Step 3: Files Export Karein
 - **🎨 Download DESIGN.md:** Is file mein saare colors, fonts, `:root` CSS variables, aur button hover states hote hain.
 - **📐 Download UI.md:** Is file mein page ke saare sections ka structure (Hero, Bento Grid, Cards) aur **Asli DOM Skeleton** hota hai.
-- **📸 Visual Chunks (.zip):** Lamba blurry screenshot lene ke bajaye page ko **1:1 crisp slices** mein kaat kar zip karta hai jo AI asaani se samajh sakti hai.
-- **📦 Clone ZIP Bundle:** Ek hi click par `DESIGN.md`, `UI.md`, `FULL_CLONE.md`, `AI_CODING_PROMPT.txt`, aur `screenshots/` folder ko zip mein download karta hai.
+- **📸 5–7 Visual Chunks (.zip):** Lamba 19,000px blurry screenshot lene ke bajaye page ko **5 se 7 high-res macro slices** mein kaat kar zip karta hai jo AI asaani se samajh sakti hai aur koi cheez miss nahi hoti.
+- **📦 Clone ZIP Bundle:** Ek hi click par `DESIGN.md`, `UI.md`, `FULL_CLONE.md`, `AI_CODING_PROMPT.txt`, aur `screenshots/` folder (5–7 chunks) ko zip mein download karta hai.
 - **🤖 Copy AI Master Prompt:** Antigravity / Cursor ke liye tayyar prompt copy karta hai.
 
 ### Step 4: AI Ko Kaise Dena Hai?
@@ -163,14 +163,14 @@ Mandatory Quality Rules:
 
 ---
 
-## ✨ What's New in Release v2.1
+## ✨ What's New in Release v2.2
 
-- 🎨 **Authentic Stripe Enterprise Light Theme:** Redesigned from the ground up with Stripe's luminous ambient pastel mesh background, pill capsule buttons (`border-radius: 9999px`), inset glass light-bevels, and floating translucent Zenflow cards.
-- 📸 **Visual Chunking Engine:** Captures native 1080p/2K viewport slices (`chunk_01.png`, `chunk_02.png`) to solve the multimodal token downscaling blur problem.
-- 🛡️ **Mega-Height Memory Safeguard:** Added memory-safe canvas allocation guards so 19,000px pages (like Stripe) capture flawlessly without memory crashes.
+- 📸 **Smart 5–7 Macro Chunking Engine:** Never captures an unreadable 19,000px monster image and never generates 20 tiny micro-slices. Long pages are cleanly sliced into exactly 5 to 7 high-resolution, perfectly legible images (`chunk_01.png` to `chunk_07.png`) that multimodal AIs (Claude, GPT-4o, Antigravity) digest with 100% optical clarity.
+- 🌊 **Deep Page Hydration Pass:** Automatically sweeps the page top-to-bottom, forces eager loading on `loading="lazy"` images, unhides scroll-animated elements (AOS, ScrollTrigger, Wow.js), and waits for font/image decoding before DOM extraction or screenshot capture.
+- 🎨 **Authentic Stripe Enterprise Light Theme:** Redesigned with Stripe's luminous ambient pastel mesh background, pill capsule buttons (`border-radius: 9999px`), inset glass light-bevels, and floating translucent cards.
+- 🛡️ **Zero Mega-Height Memory Leaks:** Canvas memory is strictly bounded per chunk, eliminating browser service worker crashes.
 - 🧱 **Real Trimmed DOM Tree Skeletons:** Extracts true DOM hierarchy while stripping out raw content and replacing with semantic placeholders (`[Heading]`, `[Paragraph]`, `[Image]`).
-- ⚡ **Dual-Mode Interactive Architecture:** Extension operates in both dynamic live extraction mode and standalone self-hydrating demo mode.
-- 🎯 **Interactive Stripe Chevrons (`›`):** Refined button micro-interactions with animated right-pointing arrows.
+- ⚡ **Dual-Mode Interactive Architecture:** Operates seamlessly in both live Chrome tab extraction and standalone self-hydrating demo mode.
 
 ---
 
