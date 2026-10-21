@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('siteTitle').textContent = 'Open a regular website to inspect';
     document.getElementById('themePill').textContent = 'N/A';
     document.getElementById('statusText').textContent = 'IDLE';
-    document.getElementById('statusBadge').style.borderColor = 'rgba(255,255,255,0.1)';
+    document.getElementById('statusBadge').style.borderColor = '#E3E8EE';
     return;
   }
 
@@ -120,8 +120,9 @@ function renderUI(data) {
   // Theme Pill
   const themePill = document.getElementById('themePill');
   themePill.textContent = data.mode === 'Dark Mode' ? '🌙 Dark Mode' : '☀️ Light Mode';
-  themePill.style.color = data.mode === 'Dark Mode' ? '#C4B5FD' : '#FDE047';
-  themePill.style.borderColor = data.mode === 'Dark Mode' ? 'rgba(139, 92, 246, 0.35)' : 'rgba(234, 179, 8, 0.35)';
+  themePill.style.color = data.mode === 'Dark Mode' ? '#635BFF' : '#0A2540';
+  themePill.style.backgroundColor = data.mode === 'Dark Mode' ? '#EDECFE' : '#F4F5F8';
+  themePill.style.borderColor = data.mode === 'Dark Mode' ? '#D4D0FC' : '#E3E8EE';
 
   // Quick Metrics
   const totalColors = data.colors.backgrounds.length + data.colors.text.length + data.colors.borders.length;
