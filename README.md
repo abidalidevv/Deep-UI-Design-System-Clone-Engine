@@ -3,7 +3,7 @@
 <div align="center">
 
 [![Manifest V3](https://img.shields.io/badge/Chrome%20Extension-Manifest%20V3-blue?style=for-the-badge&logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/mv3/intro/)
-[![AI Ready](https://img.shields.io/badge/AI%20Ready-Antigravity%20•%20Cursor%20•%20Claude-8B5CF6?style=for-the-badge&logo=openai&logoColor=white)](https://github.com/abidalidevv/Design.md-Copier)
+[![AI Ready](https://img.shields.io/badge/AI%20Ready-Antigravity%20•%20Cursor%20•%20Claude-8B5CF6?style=for-the-badge&logo=openai&logoColor=white)](https://github.com/abidalidevv/Deep-UI-Design-System-Clone-Engine)
 [![License: MIT](https://img.shields.io/badge/License-MIT-10B981?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
 **Clone any website's visual design system (`DESIGN.md`) and section wireframe (`UI.md`) into production-ready specifications for Antigravity, Cursor, Claude, and AI coding assistants.**
@@ -52,7 +52,7 @@ Works in **Google Chrome**, **Brave**, **Arc**, and **Microsoft Edge**:
 
 1. Clone or download this repository:
    ```bash
-   git clone https://github.com/abidalidevv/Design.md-Copier.git
+   git clone https://github.com/abidalidevv/Deep-UI-Design-System-Clone-Engine.git
    ```
 2. Open your browser and navigate to:
    ```text
