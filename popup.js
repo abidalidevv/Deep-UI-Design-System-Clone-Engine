@@ -8,11 +8,20 @@ let fullMarkdown = '';
 let activePreviewDoc = 'design';
 
 document.addEventListener('DOMContentLoaded', async () => {
+  if (typeof chrome === 'undefined' || !chrome.tabs) {
+    document.getElementById('siteDomain').textContent = 'UI Preview Mode';
+    document.getElementById('siteTitle').textContent = 'Click Design2MD extension icon in Chrome toolbar to inspect sites';
+    document.getElementById('themePill').textContent = 'Enterprise';
+    document.getElementById('statusText').textContent = 'PREVIEW';
+    document.getElementById('statusBadge').style.borderColor = '#E3E8EE';
+    return;
+  }
+
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
-  if (!tab || !tab.id || tab.url?.startsWith('chrome://') || tab.url?.startsWith('edge://') || tab.url?.startsWith('about:')) {
-    document.getElementById('siteDomain').textContent = 'System Page';
-    document.getElementById('siteTitle').textContent = 'Open a regular website to inspect';
+  if (!tab || !tab.id || tab.url?.startsWith('chrome://') || tab.url?.startsWith('edge://') || tab.url?.startsWith('about:') || tab.url?.startsWith('file://')) {
+    document.getElementById('siteDomain').textContent = 'System / Local Page';
+    document.getElementById('siteTitle').textContent = 'Open an HTTP / HTTPS website to inspect';
     document.getElementById('themePill').textContent = 'N/A';
     document.getElementById('statusText').textContent = 'IDLE';
     document.getElementById('statusBadge').style.borderColor = '#E3E8EE';
@@ -524,36 +533,47 @@ async function captureFullPageScreenshot(tab) {
     };
   });
 
-  // 2. Stitch chunks onto Canvas for optional master overview
+  // 2. Stitch chunks onto Canvas for optional master overview (safeguarded against OOM)
   setCaptureProgress(82, 'Generating master stitched preview...');
+  let stitchedBlob = null;
 
-  let canvasDpr = dpr;
-  if (totalHeight * canvasDpr > 16384) {
-    canvasDpr = Math.min(1.0, 16384 / totalHeight);
+  try {
+    let canvasDpr = dpr;
+    if (totalHeight * canvasDpr > 16384) {
+      canvasDpr = Math.min(1.0, 16384 / totalHeight);
+    }
+    const maxDimension = 16384;
+    const targetWidth = Math.min(maxDimension, Math.round(viewportWidth * canvasDpr));
+    const targetHeight = Math.min(maxDimension, Math.round(totalHeight * canvasDpr));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    const ctx = canvas.getContext('2d');
+
+    if (ctx) {
+      for (let i = 0; i < rawChunks.length; i++) {
+        const chunk = rawChunks[i];
+        const img = new Image();
+        img.src = chunk.dataUrl;
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+        });
+
+        const destY = Math.round(chunk.y * canvasDpr);
+        const destHeight = Math.round(viewportHeight * canvasDpr);
+        ctx.drawImage(img, 0, 0, img.width, img.height, 0, destY, canvas.width, destHeight);
+      }
+
+      setCaptureProgress(94, 'Encoding stitched image...');
+      stitchedBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    }
+  } catch (canvasErr) {
+    console.warn('Stitched canvas generation skipped (page height exceeds memory):', canvasErr);
+    // Visual chunks are still 100% safe and intact in chunkList!
   }
 
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(viewportWidth * canvasDpr);
-  canvas.height = Math.round(totalHeight * canvasDpr);
-  const ctx = canvas.getContext('2d');
-
-  for (let i = 0; i < rawChunks.length; i++) {
-    const chunk = rawChunks[i];
-    const img = new Image();
-    img.src = chunk.dataUrl;
-    await new Promise((resolve, reject) => {
-      img.onload = resolve;
-      img.onerror = reject;
-    });
-
-    const destY = Math.round(chunk.y * canvasDpr);
-    const destHeight = Math.round(viewportHeight * canvasDpr);
-    ctx.drawImage(img, 0, 0, img.width, img.height, 0, destY, canvas.width, destHeight);
-  }
-
-  setCaptureProgress(94, 'Encoding stitched image...');
-  const stitchedBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-  
   return {
     chunks: chunkList,
     stitchedBlob
