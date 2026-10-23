@@ -27,7 +27,7 @@
         <div class="brand-text">
           <div class="brand-title-row">
             <span class="brand-title">Design2MD</span>
-            <span class="pro-tag">ENTERPRISE</span>
+            <span class="pro-tag">PRO</span>
           </div>
           <span class="brand-desc">Deep UI & Clone Engine</span>
         </div>
@@ -38,6 +38,12 @@
         <span id="statusText">READY</span>
       </div>
     </header>
+
+    <!-- Demo Mode Banner (Standalone Browser Preview) -->
+    <div id="demoBanner" class="demo-banner hidden">
+      <span class="demo-badge">DEMO DATA</span>
+      <span>Preview only. Install in chrome://extensions to inspect live websites.</span>
+    </div>
 
     <!-- Target Site Glass Card -->
     <div class="site-card">
@@ -74,120 +80,72 @@
       </div>
     </div>
 
-    <!-- DUAL EXPORT HUB (The Star of the Show) -->
+    <!-- 3-BUTTON POWER HUB (Clean, Simple, 100% Complete) -->
     <div class="export-hub">
       <div class="hub-header">
         <span class="hub-title">CLONE EXPORT CENTER</span>
-        <span class="hub-sub">Select what you want to extract</span>
+        <span class="hub-sub">3-Click AI Engine</span>
       </div>
 
-      <div class="export-grid">
-        <!-- Card 1: DESIGN.md -->
-        <div class="export-card card-design">
-          <div class="export-card-header">
-            <div class="card-icon-bubble design-bubble">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"/>
-                <path d="M12 2a14.5 14.5 0 0 0 0 20 10 10 0 0 0 0-20"/>
-                <path d="M2 12h20"/>
-              </svg>
-            </div>
-            <div>
-              <div class="card-doc-name">DESIGN.md</div>
-              <div class="card-doc-type">Tokens & Visual System</div>
-            </div>
+      <!-- Button 1: Primary Hero Action (1-Click Full Bundle) -->
+      <button id="downloadZipBundleBtn" class="btn-hero-master" title="Download Complete Clone Bundle ZIP with everything included">
+        <div class="hero-btn-left">
+          <div class="hero-icon-bubble">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+              <line x1="12" y1="22.08" x2="12" y2="12"/>
+            </svg>
           </div>
-          <p class="export-card-desc">Master :root CSS tokens, palette, typography scale & Anti-AI quality rules.</p>
-          <div class="export-card-actions">
-            <button id="downloadDesignBtn" class="btn-card-action btn-design">
-              <span>Download DESIGN.md</span>
-              <span class="stripe-chevron">›</span>
-            </button>
-            <button id="copyTokensBtn" class="btn-card-ghost" title="Copy :root CSS variables">
-              <span>Copy :root CSS</span>
-              <span class="stripe-chevron">›</span>
-            </button>
+          <div class="hero-btn-content">
+            <span class="hero-btn-title">Download Complete Clone ZIP</span>
+            <span class="hero-btn-desc">1-Click: DESIGN.md + UI.md + CSS + Viewport Slices + AI Prompt</span>
           </div>
         </div>
+        <span class="hero-btn-arrow">›</span>
+      </button>
 
-        <!-- Card 2: UI.md -->
-        <div class="export-card card-ui">
-          <div class="export-card-header">
-            <div class="card-icon-bubble ui-bubble">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                <line x1="3" y1="9" x2="21" y2="9"/>
-                <line x1="9" y1="21" x2="9" y2="9"/>
-              </svg>
-            </div>
-            <div>
-              <div class="card-doc-name">UI.md</div>
-              <div class="card-doc-type">Sections & Wireframe</div>
-            </div>
-          </div>
-          <p class="export-card-desc">Exact section-by-section breakdown (Hero, Bento, FAQ) + HTML/CSS starters.</p>
-          <div class="export-card-actions">
-            <button id="downloadUiBtn" class="btn-card-action btn-ui">
-              <span>Download UI.md</span>
-              <span class="stripe-chevron">›</span>
-            </button>
-            <button id="copySectionsBtn" class="btn-card-ghost" title="Copy sections wireframe">
-              <span>Copy Sections</span>
-              <span class="stripe-chevron">›</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Quick Master Actions -->
-      <div class="master-action-row">
-        <button id="copyPromptBtn" class="btn-master-prompt" title="Copy full AI prompt for Antigravity / Cursor">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-            <line x1="12" y1="22.08" x2="12" y2="12"/>
-          </svg>
-          <span>Copy AI Master Prompt</span>
-          <span class="stripe-chevron">›</span>
-        </button>
-
-        <button id="downloadFullMdBtn" class="btn-master-full" title="Download combined All-in-One spec">
-          <span>Full Spec</span>
-          <span class="stripe-chevron">›</span>
-        </button>
-      </div>
-
-      <!-- Visual Capture & Clone Bundle Row -->
-      <div class="bundle-action-row">
-        <button id="captureScreenshotBtn" class="btn-capture-ss" title="Capture crisp 1:1 individual viewport slices (no blur)">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-            <circle cx="12" cy="13" r="4"/>
-          </svg>
-          <span id="captureSsText">Visual Chunks (.zip)</span>
-          <span class="stripe-chevron">›</span>
-        </button>
-
-        <button id="downloadZipBundleBtn" class="btn-download-zip" title="Download ZIP bundle: DESIGN.md + UI.md + Screenshot + Prompt">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-            <polyline points="7.5 4.21 12 6.81 16.5 4.21"/>
-            <polyline points="7.5 19.79 7.5 14.6 3 12"/>
-            <polyline points="21 12 16.5 14.6 16.5 19.79"/>
-            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-            <line x1="12" y1="22.08" x2="12" y2="12"/>
-          </svg>
-          <span>Clone ZIP Bundle</span>
-          <span class="stripe-chevron">›</span>
-        </button>
-      </div>
-
-      <!-- Live Progress Bar (During Screenshot Capture) -->
+      <!-- Live Progress Bar (During Screenshot & Bundle Capture) -->
       <div id="captureProgressContainer" class="capture-progress-container hidden">
         <div class="progress-bar-track">
           <div id="captureProgressBar" class="progress-bar-fill"></div>
         </div>
         <div id="captureProgressStatus" class="progress-status-text">Capturing visual chunks...</div>
+      </div>
+
+      <!-- Quick Export Dual Row: Button 2 & Button 3 -->
+      <div class="quick-export-row">
+        <!-- Button 2: DESIGN.md + :root CSS -->
+        <button id="exportDesignBtn" class="btn-sub-action btn-sub-design" title="Download DESIGN.md and copy :root CSS variables to clipboard">
+          <div class="sub-btn-icon design-icon">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 2a14.5 14.5 0 0 0 0 20 10 10 0 0 0 0-20"/>
+              <path d="M2 12h20"/>
+            </svg>
+          </div>
+          <div class="sub-btn-text">
+            <span class="sub-btn-title">Design Tokens & CSS</span>
+            <span class="sub-btn-sub">Colors, fonts & :root CSS variables</span>
+          </div>
+          <span class="stripe-chevron">›</span>
+        </button>
+
+        <!-- Button 3: UI.md + AI Master Prompt -->
+        <button id="exportUiBtn" class="btn-sub-action btn-sub-ui" title="Download UI.md and copy AI Master Prompt to clipboard">
+          <div class="sub-btn-icon ui-icon">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <line x1="3" y1="9" x2="21" y2="9"/>
+              <line x1="9" y1="21" x2="9" y2="9"/>
+            </svg>
+          </div>
+          <div class="sub-btn-text">
+            <span class="sub-btn-title">UI Wireframe & Prompt</span>
+            <span class="sub-btn-sub">DOM structure & master AI prompt</span>
+          </div>
+          <span class="stripe-chevron">›</span>
+        </button>
       </div>
     </div>
 

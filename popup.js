@@ -1,5 +1,5 @@
-// popup.js v3.2 - Fully Functional Enterprise Controller for Design2MD Pro
-// Supports dual-mode: Dynamic Live DOM Extraction on any website + Self-Hydrating Interactive Demo
+// popup.js v2.3.1 - Controller for Design2MD Pro
+// Supports dynamic live DOM extraction on any website + explicit error states (no silent demo fallback)
 
 let extractedData = null;
 let designMarkdown = '';
@@ -7,15 +7,94 @@ let uiMarkdown = '';
 let fullMarkdown = '';
 let activePreviewDoc = 'design';
 
+function showExtractionError(message) {
+  document.getElementById('statusText').textContent = 'ERROR';
+  const badge = document.getElementById('statusBadge');
+  if (badge) {
+    badge.style.borderColor = '#FCA5A5';
+    badge.style.background = '#FEF2F2';
+    badge.style.color = '#DC2626';
+  }
+  document.getElementById('siteDomain').textContent = 'Extraction Blocked / Failed';
+  document.getElementById('siteTitle').textContent = message || 'Could not access DOM on this page';
+  const pill = document.getElementById('themePill');
+  if (pill) {
+    pill.textContent = 'Unavailable';
+    pill.style.background = '#F3F4F6';
+    pill.style.color = '#9CA3AF';
+  }
+
+  // Explicitly disable all export buttons on error
+  const exportBtnIds = [
+    'downloadDesignBtn', 'copyTokensBtn', 'downloadUiBtn', 'copySectionsBtn',
+    'copyPromptBtn', 'downloadFullMdBtn', 'copyActivePreviewBtn',
+    'captureScreenshotBtn', 'downloadZipBundleBtn'
+  ];
+  exportBtnIds.forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.disabled = true;
+      btn.style.opacity = '0.4';
+      btn.style.cursor = 'not-allowed';
+    }
+  });
+
+  const previewEl = document.getElementById('previewCode');
+  if (previewEl) {
+    previewEl.textContent = `// Extraction Error:\n// ${message}\n// Please navigate to a live website (http:// or https://) and re-open the extension.`;
+  }
+}
+
+function loadStandaloneDemo() {
+  const banner = document.getElementById('demoBanner');
+  if (banner) banner.classList.remove('hidden');
+
+  document.getElementById('statusText').textContent = 'DEMO';
+  const badge = document.getElementById('statusBadge');
+  if (badge) {
+    badge.style.borderColor = '#FCD34D';
+    badge.style.background = '#FFFBEB';
+    badge.style.color = '#B45309';
+  }
+  document.getElementById('siteDomain').textContent = 'standalone_preview.local';
+  document.getElementById('siteTitle').textContent = 'Demo Mode (Open on live website to extract real DOM)';
+  const pill = document.getElementById('themePill');
+  if (pill) {
+    pill.textContent = 'Preview Only';
+    pill.style.background = '#FEF3C7';
+    pill.style.color = '#92400E';
+  }
+
+  // Explicitly disable all export buttons in demo mode so fake data is never exported
+  const exportBtnIds = [
+    'downloadDesignBtn', 'copyTokensBtn', 'downloadUiBtn', 'copySectionsBtn',
+    'copyPromptBtn', 'downloadFullMdBtn', 'copyActivePreviewBtn',
+    'captureScreenshotBtn', 'downloadZipBundleBtn'
+  ];
+  exportBtnIds.forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.disabled = true;
+      btn.style.opacity = '0.4';
+      btn.style.cursor = 'not-allowed';
+      btn.title = 'Exports disabled in Demo Preview Mode';
+    }
+  });
+
+  const previewEl = document.getElementById('previewCode');
+  if (previewEl) {
+    previewEl.textContent = `/* DEMO PREVIEW ONLY */\n/* Install extension in chrome://extensions and run on a live site to extract real design tokens and specs. */`;
+  }
+}
+
 async function initPopup() {
   initEventListeners();
 
-  // Check if running inside actual Chrome Extension context with activeTab access
   const isExtensionEnv = typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.query;
 
   if (!isExtensionEnv) {
-    // Standalone Browser Preview Mode: Hydrate with rich Stripe Enterprise demo dataset
-    loadDemoData();
+    // Standalone Browser Preview Mode: Show prominent demo banner and make read-only
+    loadStandaloneDemo();
     return;
   }
 
@@ -24,44 +103,30 @@ async function initPopup() {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
     tab = tabs && tabs[0];
   } catch (e) {
-    console.warn('Tab query failed, falling back to demo mode:', e);
+    showExtractionError('Could not query active tab: ' + e.message);
+    return;
   }
 
-  // If local file:/// or chrome:// page, hydrate with interactive Stripe demo
-  if (!tab || !tab.id || tab.url?.startsWith('chrome://') || tab.url?.startsWith('edge://') || tab.url?.startsWith('about:') || tab.url?.startsWith('file://')) {
-    loadDemoData();
+  if (!tab || !tab.id) {
+    showExtractionError('No active browser tab found.');
+    return;
+  }
+
+  // System pages restriction: show explicit error, never silent demo
+  if (tab.url?.startsWith('chrome://') || tab.url?.startsWith('edge://') || tab.url?.startsWith('about:') || tab.url?.startsWith('file://')) {
+    const scheme = tab.url.split(':')[0];
+    showExtractionError(`Browser security prevents extensions from running on ${scheme}:// pages. Please open a normal HTTP or HTTPS website.`);
     return;
   }
 
   try {
-    // 0. Progressive hydration sweep to mount lazy animations, IntersectionObservers, and SPAs
-    try {
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: async () => {
-          const orig = window.scrollY;
-          const totalH = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
-          const vh = window.innerHeight || 800;
-          const steps = Math.min(10, Math.max(4, Math.ceil(totalH / vh)));
-          for (let i = 1; i <= steps; i++) {
-            const y = Math.min(totalH, (i / steps) * totalH);
-            window.scrollTo({ top: y, behavior: 'instant' });
-            await new Promise(r => setTimeout(r, 120));
-          }
-          await new Promise(r => setTimeout(r, 180));
-          window.scrollTo({ top: orig, behavior: 'instant' });
-          await new Promise(r => setTimeout(r, 100));
-        }
-      });
-    } catch (e) {}
-
-    // 1. Inject extraction engine
+    // 1. Inject extraction engine directly onto untouched live page
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       files: ['extractor.js']
     });
 
-    // 2. Run extraction and generate all 3 modular markdown documents
+    // 2. Extract DOM tokens & layouts BEFORE any hydration styles touch the page
     const [execResult] = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       func: () => {
@@ -82,223 +147,13 @@ async function initPopup() {
       renderUI(extractedData);
       updatePreviewDisplay();
       document.getElementById('statusText').textContent = 'READY';
+    } else {
+      showExtractionError('Extraction returned empty data from the page.');
     }
   } catch (err) {
     console.error('Design2MD extraction error:', err);
-    loadDemoData();
+    showExtractionError(err.message || 'Script injection failed on this page.');
   }
-}
-
-// ─── Self-Hydrating Interactive Demo Engine ───
-function loadDemoData() {
-  extractedData = {
-    meta: {
-      domain: 'stripe.com',
-      title: 'Stripe Payments | Global Payment Processing Platform',
-      url: 'https://stripe.com/payments',
-      extractedAt: new Date().toISOString()
-    },
-    mode: 'Light Mode',
-    colors: {
-      backgrounds: [
-        { hex: '#FFFFFF', count: 48 },
-        { hex: '#F6F9FC', count: 32 },
-        { hex: '#635BFF', count: 18 },
-        { hex: '#0A2540', count: 14 },
-        { hex: '#EDECFE', count: 12 },
-        { hex: '#F4F5F8', count: 10 },
-        { hex: '#00D4FF', count: 8 },
-        { hex: '#FF7A00', count: 6 }
-      ],
-      text: [
-        { hex: '#0A2540', count: 62 },
-        { hex: '#425466', count: 45 },
-        { hex: '#697386', count: 28 },
-        { hex: '#FFFFFF', count: 22 },
-        { hex: '#635BFF', count: 16 },
-        { hex: '#059669', count: 8 }
-      ],
-      borders: [
-        { hex: '#E3E8EE', count: 34 },
-        { hex: '#CAD3DF', count: 16 },
-        { hex: '#D8DEE4', count: 12 }
-      ],
-      gradients: [
-        'linear-gradient(90deg, #FF7A00, #FF2E93 25%, #635BFF 55%, #00D4FF)',
-        'linear-gradient(180deg, #6860FF 0%, #5247E6 100%)',
-        'radial-gradient(circle at 50% 0%, rgba(99, 91, 255, 0.15), transparent 70%)',
-        'linear-gradient(180deg, #FFFFFF 0%, #F6F9FC 100%)'
-      ]
-    },
-    typography: {
-      fontFamilies: [
-        { name: 'Söhne', count: 54 },
-        { name: 'Plus Jakarta Sans', count: 32 },
-        { name: 'JetBrains Mono', count: 12 }
-      ],
-      hierarchy: {
-        h1: { fontSize: '48px', fontWeight: '800', lineHeight: '1.1', sampleText: 'Financial infrastructure to grow your revenue.' },
-        h2: { fontSize: '32px', fontWeight: '700', lineHeight: '1.2', sampleText: 'Flexible solutions for every business model.' },
-        h3: { fontSize: '22px', fontWeight: '700', lineHeight: '1.3', sampleText: 'Embed payments in your platform.' },
-        p: { fontSize: '16px', fontWeight: '400', lineHeight: '1.6', sampleText: 'Accept payments, handle business banking, and implement custom revenue models.' },
-        button: { fontSize: '13px', fontWeight: '600', lineHeight: '1', sampleText: 'Get started ›' }
-      }
-    },
-    sections: [
-      {
-        type: 'Hero Banner',
-        position: { width: 1280, height: 680, top: 0 },
-        tag: 'header',
-        classes: 'hero-banner stripe-mesh-bg',
-        content: {
-          headings: [{ tag: 'h1', text: 'Financial infrastructure to grow your revenue.' }],
-          buttons: ['Get started ›', 'Sign up with Google']
-        }
-      },
-      {
-        type: 'Feature Bento Grid',
-        position: { width: 1280, height: 540, top: 680 },
-        tag: 'section',
-        classes: 'bento-features-grid',
-        content: {
-          headings: [{ tag: 'h2', text: 'Flexible solutions for every business model.' }],
-          buttons: ['Explore products ›']
-        }
-      },
-      {
-        type: 'Interactive Zenflow Card',
-        position: { width: 1280, height: 620, top: 1220 },
-        tag: 'section',
-        classes: 'embedded-payments-showcase',
-        content: {
-          headings: [{ tag: 'h2', text: 'Embed payments in your platform.' }],
-          buttons: ['Daybreak Yoga Demo']
-        }
-      },
-      {
-        type: 'Global Enterprise Trust',
-        position: { width: 1280, height: 420, top: 1840 },
-        tag: 'section',
-        classes: 'enterprise-logos-strip',
-        content: {
-          headings: [{ tag: 'h3', text: 'Global GDP running on Stripe' }],
-          buttons: ['View customer stories ›']
-        }
-      }
-    ],
-    components: {
-      navbar: {
-        dimensions: { height: 64 },
-        navLinks: ['Products', 'Solutions', 'Developers', 'Resources', 'Pricing'],
-        style: { background: 'rgba(255, 255, 255, 0.95)' }
-      },
-      buttons: [
-        { text: 'Get started ›', style: { background: '#635BFF', borderRadius: '9999px' } },
-        { text: 'Sign up with Google', style: { background: '#FFFFFF', borderRadius: '9999px' } },
-        { text: 'Contact sales ›', style: { background: '#635BFF', borderRadius: '9999px' } }
-      ],
-      cards: [
-        { innerStructure: 'Zenflow Connected Accounts Card', style: { background: '#FFFFFF', borderRadius: '16px' } },
-        { innerStructure: 'Daybreak Yoga Checkout Modal', style: { background: '#FFFFFF', borderRadius: '16px' } }
-      ],
-      footer: {
-        columnCount: 4,
-        linkCount: 24,
-        dimensions: { height: 380 },
-        style: { background: '#F6F9FC' }
-      }
-    }
-  };
-
-  designMarkdown = `# 🎨 DESIGN.md — Design Tokens Specification
-> **Source Website:** [stripe.com](https://stripe.com/payments)
-> **Extracted Mode:** Light Mode | **Engine:** Design2MD Pro Enterprise
-
-## 1. 🛡️ Architectural & Visual Quality Directives
-- 🎯 **Color Palette Fidelity:** Use ONLY the exact HSL/Hex palette defined in this document (\`var(--bg-primary)\`, \`var(--bg-surface)\`, \`var(--text-primary)\`).
-- 🎯 **Typography Tracking:** Headings MUST use tightened letter-spacing (\`-0.025em\`) and bold weights (\`700/800\`).
-- 🎯 **Border Radius System:** Follow the extracted scale: Cards (\`16px\`), Buttons (\`9999px\` pill capsule).
-- 🎯 **Glassmorphism:** Apply \`backdrop-filter: blur(12px)\` to elevated cards and navigation bars.
-- 🎯 **Micro-Interactions:** Interactive elements MUST have transitions (\`all 0.2s cubic-bezier(0.16, 1, 0.3, 1)\`).
-
-## 2. 🎨 Master CSS Design Tokens (:root)
-\`\`\`css
-:root {
-  /* Surfaces */
-  --bg-primary: #FFFFFF;
-  --bg-surface: #FFFFFF;
-  --bg-canvas: #F6F9FC;
-  --bg-accent: #EDECFE;
-
-  /* Typography Colors */
-  --text-primary: #0A2540;
-  --text-secondary: #425466;
-  --text-muted: #697386;
-
-  /* Brand Accents */
-  --brand-blurple: #635BFF;
-  --brand-blurple-hover: #5348E8;
-  --accent-cyan: #00D4FF;
-  --accent-amber: #FF7A00;
-
-  /* Borders & Elevation */
-  --border-hairline: rgba(10, 37, 64, 0.12);
-  --border-subtle: #E3E8EE;
-  --radius-card: 16px;
-  --radius-pill: 9999px;
-  --shadow-card: 0 10px 25px -5px rgba(50, 50, 93, 0.05), 0 0 0 1px rgba(10, 37, 64, 0.03);
-  --shadow-button-primary: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 3px 6px -1px rgba(50, 50, 93, 0.12);
-}
-\`\`\`
-`;
-
-  uiMarkdown = `# 📐 UI.md — Page Layout & Wireframe Blueprint
-> **Source Website:** [stripe.com](https://stripe.com/payments)
-> **Extracted Sections:** 4 detected landmark containers
-
-## 1. Executive Page Rhythm Map
-| # | Section Type | Container Tag | Dimensions | Key Visual Purpose |
-|---|---|---|---|---|
-| 1 | Hero Banner | \`<header class="hero-banner">\` | 1280px × 680px | Value proposition, H1, CTA pill buttons |
-| 2 | Feature Bento Grid | \`<section class="bento-features">\` | 1280px × 540px | Multi-column solution grid |
-| 3 | Interactive Zenflow Card | \`<section class="embedded-payments">\` | 1280px × 620px | Floating card checkout demo |
-| 4 | Global Enterprise Trust | \`<section class="enterprise-logos">\` | 1280px × 420px | Customer proof & metric badges |
-
-## 2. Asli DOM Skeleton (Section 1: Hero Banner)
-\`\`\`html
-<header class="hero-banner stripe-mesh-bg">
-  <div class="container mx-auto">
-    <div class="hero-content">
-      <span class="badge-pill">Global GDP running on Stripe: 1.73%</span>
-      <h1 class="hero-headline">Financial infrastructure to grow your revenue.</h1>
-      <p class="hero-subtext">Accept payments, handle business banking, and implement custom revenue models.</p>
-      <div class="cta-row">
-        <button class="btn-primary-pill">Get started ›</button>
-        <button class="btn-secondary-pill">Sign up with Google</button>
-      </div>
-    </div>
-  </div>
-</header>
-\`\`\`
-`;
-
-  fullMarkdown = `# 📦 FULL_CLONE.md — Complete Antigravity UI Specification
-> **Domain:** stripe.com
-
-${designMarkdown}
-
-${uiMarkdown}
-
-## 🤖 Antigravity / AI Coding Prompt
-\`\`\`text
-You are an expert Frontend Architect. Rebuild this application matching the exact design tokens, typography, and layout specified in DESIGN.md and UI.md above. Maintain 100% fidelity to the color palette, pill button radius (9999px), inset light bevels, and 16px rounded floating cards. Do not use generic AI templates.
-\`\`\`
-`;
-
-  renderUI(extractedData);
-  updatePreviewDisplay();
-  document.getElementById('statusText').textContent = 'READY';
-  document.getElementById('statusBadge').style.borderColor = '#A7F3D0';
 }
 
 // ─── Attach All Event Listeners ───
@@ -328,50 +183,33 @@ function initEventListeners() {
     setActivePreview('full', 'viewFullTab');
   });
 
-  // Action Buttons
-  document.getElementById('downloadDesignBtn')?.addEventListener('click', () => {
+  // Action Buttons: 3-Button Power Hub
+  document.getElementById('exportDesignBtn')?.addEventListener('click', () => {
     if (!designMarkdown) return;
-    const domain = extractedData?.meta?.domain?.replace(/[^a-zA-Z0-9]/g, '_') || 'stripe_com';
+    const domain = extractedData?.meta?.domain?.replace(/[^a-zA-Z0-9]/g, '_') || 'target_site';
     downloadFile(`${domain}_DESIGN.md`, designMarkdown);
-  });
-
-  document.getElementById('copyTokensBtn')?.addEventListener('click', () => {
-    if (!designMarkdown) return;
     const tokenMatch = designMarkdown.match(/## 2\. 🎨 Master CSS Design Tokens[\s\S]*?```css([\s\S]*?)```/);
     const tokenText = tokenMatch ? tokenMatch[1].trim() : '';
     if (tokenText) {
-      copyToClipboard(tokenText, 'CSS :root tokens copied!');
+      copyToClipboard(tokenText, 'DESIGN.md saved & :root CSS copied to clipboard!');
     } else {
-      copyToClipboard(designMarkdown, 'DESIGN.md copied!');
+      copyToClipboard(designMarkdown, 'DESIGN.md saved & copied!');
     }
   });
 
-  document.getElementById('downloadUiBtn')?.addEventListener('click', () => {
+  document.getElementById('exportUiBtn')?.addEventListener('click', () => {
     if (!uiMarkdown) return;
-    const domain = extractedData?.meta?.domain?.replace(/[^a-zA-Z0-9]/g, '_') || 'stripe_com';
+    const domain = extractedData?.meta?.domain?.replace(/[^a-zA-Z0-9]/g, '_') || 'target_site';
     downloadFile(`${domain}_UI.md`, uiMarkdown);
-  });
-
-  document.getElementById('copySectionsBtn')?.addEventListener('click', () => {
-    if (!uiMarkdown) return;
-    const sectionsMatch = uiMarkdown.match(/## 1\. Executive Page Rhythm Map[\s\S]*?## 2\./);
-    const sectionsText = sectionsMatch ? sectionsMatch[0].replace(/## 2\./, '').trim() : uiMarkdown;
-    copyToClipboard(sectionsText, 'Sections Wireframe copied!');
-  });
-
-  document.getElementById('copyPromptBtn')?.addEventListener('click', () => {
     const promptMatch = fullMarkdown.match(/## 🤖 Antigravity \/ AI Coding Prompt[\s\S]*?```text([\s\S]*?)```/)
       || designMarkdown.match(/## 🤖 Antigravity \/ AI Coding Prompt[\s\S]*?```text([\s\S]*?)```/);
     const promptText = promptMatch ? promptMatch[1].trim() : (designMarkdown || fullMarkdown);
-    copyToClipboard(promptText, 'Antigravity Master Prompt copied!');
+    copyToClipboard(promptText, 'UI.md saved & AI Master Prompt copied to clipboard!');
   });
 
-  document.getElementById('downloadFullMdBtn')?.addEventListener('click', () => {
-    if (!fullMarkdown) return;
-    const domain = extractedData?.meta?.domain?.replace(/[^a-zA-Z0-9]/g, '_') || 'stripe_com';
-    downloadFile(`${domain}_FULL_CLONE.md`, fullMarkdown);
-  });
+  document.getElementById('downloadZipBundleBtn')?.addEventListener('click', handleDownloadZipBundle);
 
+  // Preview tab copy button
   document.getElementById('copyActivePreviewBtn')?.addEventListener('click', () => {
     if (activePreviewDoc === 'design') {
       copyToClipboard(designMarkdown, 'DESIGN.md copied!');
@@ -381,9 +219,6 @@ function initEventListeners() {
       copyToClipboard(fullMarkdown, 'FULL_CLONE.md copied!');
     }
   });
-
-  document.getElementById('captureScreenshotBtn')?.addEventListener('click', handleCaptureScreenshot);
-  document.getElementById('downloadZipBundleBtn')?.addEventListener('click', handleDownloadZipBundle);
 }
 
 function setActivePreview(docType, btnId) {
@@ -657,186 +492,357 @@ function downloadBlob(blob, filename) {
   showToast(`Downloaded ${filename}!`);
 }
 
-async function captureFullPageScreenshot(tab) {
-  setCaptureProgress(5, 'Analyzing page geometry...');
+// ─── Popup-Close Cleanup Safety Handler ───
+let currentCapturingTabId = null;
 
-  // 1. Measure dimensions in target tab
-  const [infoResult] = await chrome.scripting.executeScript({
-    target: { tabId: tab.id },
-    func: () => {
-      const origScrollY = window.scrollY;
-      const origScrollX = window.scrollX;
-      const body = document.body;
-      const html = document.documentElement;
-
-      const totalHeight = Math.max(
-        body.scrollHeight, html.scrollHeight,
-        body.offsetHeight, html.offsetHeight,
-        body.clientHeight, html.clientHeight
-      );
-      const totalWidth = Math.max(
-        body.scrollWidth, html.scrollWidth,
-        window.innerWidth
-      );
-      const viewportHeight = window.innerHeight;
-      const viewportWidth = window.innerWidth;
-      const dpr = window.devicePixelRatio || 1;
-
-      return {
-        totalHeight,
-        totalWidth,
-        viewportHeight,
-        viewportWidth,
-        dpr,
-        origScrollX,
-        origScrollY
-      };
-    }
-  });
-
-  if (!infoResult || !infoResult.result) {
-    throw new Error('Could not calculate page dimensions');
+window.addEventListener('pagehide', () => {
+  if (currentCapturingTabId) {
+    try {
+      chrome.runtime.sendMessage({ action: 'CLEANUP', tabId: currentCapturingTabId });
+    } catch (e) {}
   }
+});
 
-  const {
-    totalHeight,
-    totalWidth,
-    viewportHeight,
-    viewportWidth,
-    dpr,
-    origScrollX,
-    origScrollY
-  } = infoResult.result;
+window.addEventListener('unload', () => {
+  if (currentCapturingTabId) {
+    try {
+      chrome.runtime.sendMessage({ action: 'CLEANUP', tabId: currentCapturingTabId });
+    } catch (e) {}
+  }
+});
 
-  const numSteps = Math.max(1, Math.ceil(totalHeight / viewportHeight));
-  const rawChunks = [];
+// ─── Background Service Worker Throttled Capture Helper ───
+async function requestTabCapture(tab) {
+  try {
+    const res = await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({ action: 'CAPTURE_TAB', windowId: tab.windowId }, (response) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else if (response && response.error) {
+          reject(new Error(response.error));
+        } else if (response && response.dataUrl) {
+          resolve(response.dataUrl);
+        } else {
+          reject(new Error('Empty capture returned'));
+        }
+      });
+    });
+    return res;
+  } catch (bgErr) {
+    // Fallback: direct capture with 650ms minimum interval
+    await new Promise(r => setTimeout(r, 650));
+    return new Promise((resolve, reject) => {
+      chrome.tabs.captureVisibleTab(null, { format: 'png' }, (dataUrl) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else if (!dataUrl) {
+          reject(new Error('Direct capture failed'));
+        } else {
+          resolve(dataUrl);
+        }
+      });
+    });
+  }
+}
+
+// ─── Reversible Deep Page Hydration Pass ───
+async function performDeepPageHydration(tabId, onProgress) {
+  if (onProgress) onProgress(10, 'Deep hydrating lazy assets & animations...');
 
   try {
-    for (let step = 0; step < numSteps; step++) {
-      const scrollY = (step === numSteps - 1 && numSteps > 1)
-        ? Math.max(0, totalHeight - viewportHeight)
-        : step * viewportHeight;
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: async () => {
+        const localOrigX = window.scrollX;
+        const localOrigY = window.scrollY;
+        window.__design2md_cancelled = false;
 
-      setCaptureProgress(
-        Math.round((step / numSteps) * 75) + 5,
-        `Capturing crisp slice ${step + 1} of ${numSteps}...`
-      );
+        // 1. Initialize master state if not already created
+        if (!window.__design2md_state) {
+          window.__design2md_state = {
+            originalScroll: { x: localOrigX, y: localOrigY },
+            modifiedInlineStyles: [],
+            hiddenFixedElements: [],
+            hydrationStyleId: '__design2md_hydration_style'
+          };
+        }
 
-      // Scroll and hide sticky header on chunks > 0
-      await chrome.scripting.executeScript({
+        // 2. Inject temporary hydration style (will be removed in cleanup)
+        let animStyle = document.getElementById('__design2md_hydration_style');
+        if (!animStyle) {
+          animStyle = document.createElement('style');
+          animStyle.id = '__design2md_hydration_style';
+          animStyle.textContent = `
+            [data-aos], .aos-init, [data-scroll], [data-reveal], .reveal, .fade-in, .animate-on-scroll {
+              opacity: 1 !important;
+              visibility: visible !important;
+              transform: none !important;
+              animation: none !important;
+              transition: none !important;
+            }
+            img[loading], img[data-src], img[data-lazy-src], picture source[data-srcset] {
+              opacity: 1 !important;
+            }
+          `;
+          document.head.appendChild(animStyle);
+        }
+
+        // 3. Unmask inline opacity:0 and visibility:hidden styles SAFELY by storing original value & set value
+        document.querySelectorAll('*').forEach(el => {
+          if (el.style) {
+            if (el.style.opacity === '0') {
+              window.__design2md_state.modifiedInlineStyles.push({ el, prop: 'opacity', oldValue: el.style.opacity, setValue: '1' });
+              el.style.opacity = '1';
+            }
+            if (el.style.visibility === 'hidden') {
+              window.__design2md_state.modifiedInlineStyles.push({ el, prop: 'visibility', oldValue: el.style.visibility, setValue: 'visible' });
+              el.style.visibility = 'visible';
+            }
+          }
+        });
+
+        // 4. Promote lazy images even if placeholder src exists
+        document.querySelectorAll('img, picture source, iframe').forEach(el => {
+          if (el.hasAttribute('loading')) el.setAttribute('loading', 'eager');
+          const dSrc = el.dataset.src || el.dataset.lazySrc || el.dataset.original;
+          if (dSrc) {
+            if (!el.src || el.src.startsWith('data:') || el.src.includes('blank') || el.src.includes('placeholder') || el.src !== dSrc) {
+              el.src = dSrc;
+            }
+          }
+          const dSrcset = el.dataset.srcset || el.dataset.lazySrcset;
+          if (dSrcset && (!el.srcset || el.srcset !== dSrcset)) {
+            el.srcset = dSrcset;
+          }
+        });
+
+        // 5. Progressive sweep with safe caps: max 40 steps, max 8 seconds, infinite-scroll detection
+        const vh = window.innerHeight || 800;
+        const stepSize = Math.max(200, Math.round(0.8 * vh));
+        let curY = 0;
+        let stepCount = 0;
+        const maxSteps = 40;
+        const startTime = Date.now();
+        const maxDurationMs = 8000;
+        let previousHeight = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+        let consecutiveGrowthCount = 0;
+
+        while (curY < Math.max(document.body.scrollHeight, document.documentElement.scrollHeight) && stepCount < maxSteps) {
+          if (window.__design2md_cancelled) {
+            window.scrollTo({ top: localOrigY, left: localOrigX, behavior: 'instant' });
+            return;
+          }
+          if (Date.now() - startTime > maxDurationMs) break;
+
+          curY += stepSize;
+          stepCount++;
+          window.scrollTo({ top: curY, behavior: 'instant' });
+          window.dispatchEvent(new Event('scroll'));
+          await new Promise(r => setTimeout(r, 65));
+
+          const currentH = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+          if (currentH > previousHeight + 200) {
+            consecutiveGrowthCount++;
+            previousHeight = currentH;
+            if (consecutiveGrowthCount > 5) {
+              // Infinite-scroll feed detected, break out of loop
+              break;
+            }
+          }
+        }
+
+        if (window.__design2md_cancelled) {
+          window.scrollTo({ top: localOrigY, left: localOrigX, behavior: 'instant' });
+          return;
+        }
+
+        // 6. Await web fonts
+        if (document.fonts && document.fonts.ready) {
+          try { await document.fonts.ready; } catch(e) {}
+        }
+
+        if (window.__design2md_cancelled) {
+          window.scrollTo({ top: localOrigY, left: localOrigX, behavior: 'instant' });
+          return;
+        }
+
+        // 7. Await pending images
+        const pendingImages = Array.from(document.images).filter(img => !img.complete && img.src);
+        if (pendingImages.length > 0) {
+          await Promise.race([
+            Promise.all(pendingImages.map(img => {
+              if (img.decode) return img.decode().catch(() => {});
+              return new Promise(res => { img.onload = img.onerror = res; setTimeout(res, 800); });
+            })),
+            new Promise(res => setTimeout(res, 1800))
+          ]);
+        }
+
+        // 8. Settle layout and restore scroll to original user position
+        await new Promise(r => setTimeout(r, 120));
+        window.scrollTo({
+          top: localOrigY,
+          left: localOrigX,
+          behavior: 'instant'
+        });
+        window.dispatchEvent(new Event('scroll'));
+        await new Promise(r => setTimeout(r, 80));
+      }
+    });
+  } catch (e) {
+    console.warn('Hydration script warning:', e);
+  }
+
+  if (onProgress) onProgress(25, 'Hydration complete!');
+}
+
+// ─── Native Viewport Slices Capture Engine (1440 x 900–1200px) ───
+async function captureViewportChunks(tab) {
+  setCaptureProgress(5, 'Deep hydrating page...');
+  currentCapturingTabId = tab.id;
+
+  try {
+    // 1. Read initial state before anything touches the page
+    const [initGeom] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => ({
+        origX: window.scrollX,
+        origY: window.scrollY,
+        viewportHeight: window.innerHeight,
+        viewportWidth: window.innerWidth,
+        dpr: window.devicePixelRatio || 1
+      })
+    });
+
+    const { viewportHeight, viewportWidth, dpr } = initGeom.result;
+
+    // 2. Perform deep hydration
+    await performDeepPageHydration(tab.id, (pct, msg) => setCaptureProgress(pct, msg));
+
+    // 3. Slice step size = viewportHeight - 40px overlap (no artificial 600px min)
+    const stepSize = Math.max(100, viewportHeight - 40);
+
+    // Re-measure full height after hydration
+    const [sizeRes] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => Math.max(document.body.scrollHeight, document.documentElement.scrollHeight)
+    });
+    let totalHeight = sizeRes.result || viewportHeight;
+
+    const generatedChunks = [];
+    const maxChunks = 30;
+    let currentY = 0;
+    let chunkIndex = 0;
+
+    while (currentY < totalHeight && chunkIndex < maxChunks) {
+      chunkIndex++;
+      const percent = Math.min(95, Math.round(25 + ((currentY / Math.max(1, totalHeight)) * 70)));
+      setCaptureProgress(percent, `Capturing viewport slice ${chunkIndex}...`);
+
+      // Scroll to position, hide fixed/sticky elements from step 2 onward, re-measure page height
+      const [stepInfo] = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        args: [scrollY, step],
-        func: (y, stepIndex) => {
+        args: [currentY, chunkIndex - 1],
+        func: (y, stepIdx) => {
           window.scrollTo({ top: y, left: 0, behavior: 'instant' });
-          if (stepIndex > 0) {
-            if (!window.__design2md_hidden_fixed) {
-              window.__design2md_hidden_fixed = [];
+          const actualY = window.scrollY;
+          const freshHeight = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+
+          // Hide fixed/sticky elements on step > 0 and record in window.__design2md_state
+          if (stepIdx > 0 && window.__design2md_state) {
+            if (window.__design2md_state.hiddenFixedElements.length === 0) {
               document.querySelectorAll('*').forEach(el => {
                 const style = window.getComputedStyle(el);
                 if (style.position === 'fixed' || style.position === 'sticky') {
                   const rect = el.getBoundingClientRect();
-                  if (rect.top <= 120 && rect.height < 200) {
-                    window.__design2md_hidden_fixed.push({ el, origVis: el.style.visibility });
+                  const isTopHeader = rect.top <= 120 && rect.height < 250;
+                  const isBottomWidget = rect.bottom >= (window.innerHeight - 150) && rect.height < 250;
+                  if (isTopHeader || isBottomWidget) {
+                    window.__design2md_state.hiddenFixedElements.push({ el, origVis: el.style.visibility });
                     el.style.visibility = 'hidden';
                   }
                 }
               });
             }
           }
+          return { actualY, freshHeight };
         }
       });
 
-      // Brief pause for lazy load images / repaint
+      if (stepInfo?.result?.freshHeight && stepInfo.result.freshHeight > totalHeight) {
+        totalHeight = stepInfo.result.freshHeight;
+      }
+
       await new Promise(r => setTimeout(r, 260));
 
-      // Capture visible tab chunk at native resolution
-      const dataUrl = await new Promise((resolve, reject) => {
-        chrome.tabs.captureVisibleTab(null, { format: 'png' }, (res) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-          } else if (!res) {
-            reject(new Error('Empty capture received'));
-          } else {
-            resolve(res);
-          }
-        });
+      // Throttled capture via background service worker
+      const dataUrl = await requestTabCapture(tab);
+      const chunkBlob = dataUrlToBlob(dataUrl);
+      const chunkNum = String(chunkIndex).padStart(2, '0');
+      generatedChunks.push({
+        chunkIndex,
+        filename: `chunk_${chunkNum}.png`,
+        blob: chunkBlob
       });
 
-      rawChunks.push({ dataUrl, y: scrollY, step });
+      // Advance scroll
+      currentY += stepSize;
+
+      // If Chrome clamped scrollY to bottom because we reached end of document, break
+      const actualY = stepInfo?.result?.actualY ?? 0;
+      if (actualY + viewportHeight >= totalHeight) {
+        break;
+      }
     }
+
+    let truncationNotice = null;
+    if (chunkIndex >= maxChunks && currentY < totalHeight) {
+      const estimatedTotalSlices = Math.ceil(totalHeight / stepSize);
+      truncationNotice = `Page exceeded 30 slices (${chunkIndex} of ~${estimatedTotalSlices} captured due to limit).`;
+    }
+
+    return {
+      chunks: generatedChunks,
+      numChunks: generatedChunks.length,
+      truncationNotice
+    };
   } finally {
-    // Always restore page scroll & sticky headers
+    currentCapturingTabId = null;
+    // ALWAYS run master cleanup restoring modified inline styles, hidden fixed elements, and scroll
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
-      args: [origScrollX, origScrollY],
-      func: (origX, origY) => {
-        window.scrollTo({ top: origY, left: origX, behavior: 'instant' });
-        if (window.__design2md_hidden_fixed) {
-          window.__design2md_hidden_fixed.forEach(item => {
-            item.el.style.visibility = item.origVis;
-          });
-          delete window.__design2md_hidden_fixed;
+      func: () => {
+        window.__design2md_cancelled = true;
+        if (window.__design2md_state) {
+          const s = window.__design2md_state;
+          const styleEl = document.getElementById(s.hydrationStyleId || '__design2md_hydration_style');
+          if (styleEl) styleEl.remove();
+
+          if (s.modifiedInlineStyles && Array.isArray(s.modifiedInlineStyles)) {
+            s.modifiedInlineStyles.forEach(({ el, prop, oldValue, setValue }) => {
+              try {
+                if (el && el.style && el.style[prop] === setValue) {
+                  el.style[prop] = oldValue;
+                }
+              } catch (e) {}
+            });
+          }
+
+          if (s.hiddenFixedElements && Array.isArray(s.hiddenFixedElements)) {
+            s.hiddenFixedElements.forEach(({ el, origVis }) => {
+              try { if (el && el.style) el.style.visibility = origVis; } catch (e) {}
+            });
+          }
+
+          if (s.originalScroll) {
+            try { window.scrollTo({ top: s.originalScroll.y, left: s.originalScroll.x, behavior: 'instant' }); } catch (e) {}
+          }
+
+          delete window.__design2md_state;
         }
       }
-    });
+    }).catch(() => {});
   }
-
-  // Convert each chunk to an individual high-res PNG Blob
-  const chunkList = rawChunks.map((chunk, i) => {
-    const filename = `chunk_${String(i + 1).padStart(2, '0')}.png`;
-    return {
-      step: chunk.step,
-      filename,
-      blob: dataUrlToBlob(chunk.dataUrl),
-      dataUrl: chunk.dataUrl,
-      y: chunk.y
-    };
-  });
-
-  // 2. Stitch chunks onto Canvas for optional master overview (safeguarded against OOM)
-  setCaptureProgress(82, 'Generating master stitched preview...');
-  let stitchedBlob = null;
-
-  try {
-    let canvasDpr = dpr;
-    if (totalHeight * canvasDpr > 16384) {
-      canvasDpr = Math.min(1.0, 16384 / totalHeight);
-    }
-    const maxDimension = 16384;
-    const targetWidth = Math.min(maxDimension, Math.round(viewportWidth * canvasDpr));
-    const targetHeight = Math.min(maxDimension, Math.round(totalHeight * canvasDpr));
-
-    const canvas = document.createElement('canvas');
-    canvas.width = targetWidth;
-    canvas.height = targetHeight;
-    const ctx = canvas.getContext('2d');
-
-    if (ctx) {
-      for (let i = 0; i < rawChunks.length; i++) {
-        const chunk = rawChunks[i];
-        const img = new Image();
-        img.src = chunk.dataUrl;
-        await new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = reject;
-        });
-
-        const destY = Math.round(chunk.y * canvasDpr);
-        const destHeight = Math.round(viewportHeight * canvasDpr);
-        ctx.drawImage(img, 0, 0, img.width, img.height, 0, destY, canvas.width, destHeight);
-      }
-
-      setCaptureProgress(94, 'Encoding stitched image...');
-      stitchedBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-    }
-  } catch (canvasErr) {
-    console.warn('Stitched canvas generation skipped (page height exceeds memory):', canvasErr);
-  }
-
-  return {
-    chunks: chunkList,
-    stitchedBlob
-  };
 }
 
 async function handleCaptureScreenshot() {
@@ -844,7 +850,7 @@ async function handleCaptureScreenshot() {
   const isExtensionEnv = typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.query;
 
   if (!isExtensionEnv) {
-    showToast('Visual chunks capture requires opening extension on a live website tab');
+    showToast('Visual capture requires opening extension on a live website tab');
     return;
   }
 
@@ -855,31 +861,32 @@ async function handleCaptureScreenshot() {
   } catch (e) {}
 
   if (!tab || !tab.id || tab.url?.startsWith('file://') || tab.url?.startsWith('chrome://')) {
-    showToast('Open a live website (like stripe.com) to capture visual slices');
+    showToast('Open a live website to capture visual slices');
     return;
   }
 
   btn.disabled = true;
   try {
-    const captureResult = await captureFullPageScreenshot(tab);
-    setCaptureProgress(98, 'Packaging crisp visual chunks...');
-    const domain = extractedData?.meta?.domain?.replace(/[^a-zA-Z0-9]/g, '_') || 'site';
+    const captureResult = await captureViewportChunks(tab);
+    setCaptureProgress(95, `Packaging ${captureResult.chunks.length} viewport slices...`);
+    const domain = extractedData?.meta?.domain?.replace(/[^a-zA-Z0-9]/g, '_') || 'target_site';
 
-    if (captureResult.chunks.length === 1) {
+    if (captureResult.chunks.length === 1 && !captureResult.truncationNotice) {
       downloadBlob(captureResult.chunks[0].blob, `${domain}_chunk_01.png`);
     } else {
       const zip = new JSZip();
       captureResult.chunks.forEach(c => {
-        zip.file(c.filename, c.blob);
+        zip.file(c.filename, c.blob, { compression: 'STORE' });
       });
-      if (captureResult.stitchedBlob) {
-        zip.file('FULL_STITCHED_OVERVIEW.png', captureResult.stitchedBlob);
+      if (captureResult.truncationNotice) {
+        zip.file('CHUNK_TRUNCATION_NOTICE.txt', captureResult.truncationNotice);
+        showToast(captureResult.truncationNotice);
       }
       const zipBlob = await zip.generateAsync({ type: 'blob' });
-      downloadBlob(zipBlob, `${domain}_VISUAL_CHUNKS.zip`);
+      downloadBlob(zipBlob, `${domain}_VIEWPORT_CHUNKS.zip`);
     }
 
-    setCaptureProgress(100, 'Chunks Ready!');
+    setCaptureProgress(100, `Done! ${captureResult.chunks.length} Slices Saved`);
     setTimeout(() => hideCaptureProgress(), 1800);
   } catch (err) {
     console.error('Screenshot capture failed:', err);
@@ -900,8 +907,8 @@ async function handleDownloadZipBundle() {
 
   btn.disabled = true;
   try {
-    setCaptureProgress(20, 'Preparing bundle files...');
-    const domain = extractedData?.meta?.domain?.replace(/[^a-zA-Z0-9]/g, '_') || 'stripe_com';
+    setCaptureProgress(15, 'Preparing bundle specifications...');
+    const domain = extractedData?.meta?.domain?.replace(/[^a-zA-Z0-9]/g, '_') || 'target_site';
     const zip = new JSZip();
     const folderName = `${domain}_Clone_Bundle`;
     const folder = zip.folder(folderName);
@@ -910,33 +917,43 @@ async function handleDownloadZipBundle() {
     folder.file('UI.md', uiMarkdown || '# UI.md\n');
     folder.file('FULL_CLONE.md', fullMarkdown || '# FULL_CLONE.md\n');
 
+    // Standalone CSS Variables file for instant copy-paste into project
+    const tokenMatch = (designMarkdown || '').match(/## 2\. 🎨 Master CSS Design Tokens[\s\S]*?```css([\s\S]*?)```/);
+    const tokenCss = tokenMatch ? tokenMatch[1].trim() : '';
+    if (tokenCss) {
+      folder.file('ROOT_VARIABLES.css', tokenCss + '\n');
+    }
+
     const promptMatch = fullMarkdown.match(/## 🤖 Antigravity \/ AI Coding Prompt[\s\S]*?```text([\s\S]*?)```/)
       || designMarkdown.match(/## 🤖 Antigravity \/ AI Coding Prompt[\s\S]*?```text([\s\S]*?)```/);
     const promptText = promptMatch ? promptMatch[1].trim() : (designMarkdown || fullMarkdown);
     folder.file('AI_CODING_PROMPT.txt', promptText || 'Rebuild this site matching DESIGN.md and UI.md');
 
-    // If running in live website tab, capture screenshots too!
+    // Capture viewport-sized visual chunks
     const isExtensionEnv = typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.query;
     if (isExtensionEnv) {
       try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (tab && tab.id && !tab.url?.startsWith('file://') && !tab.url?.startsWith('chrome://')) {
-          setCaptureProgress(40, 'Capturing live visual chunks...');
-          const captureResult = await captureFullPageScreenshot(tab);
+          setCaptureProgress(30, 'Capturing viewport visual slices...');
+          const captureResult = await captureViewportChunks(tab);
           const ssFolder = folder.folder('screenshots');
           captureResult.chunks.forEach(c => {
-            ssFolder.file(c.filename, c.blob);
+            ssFolder.file(c.filename, c.blob, { compression: 'STORE' });
           });
-          if (captureResult.stitchedBlob) {
-            ssFolder.file('FULL_STITCHED_PAGE.png', captureResult.stitchedBlob);
+          if (captureResult.truncationNotice) {
+            folder.file('CHUNK_TRUNCATION_NOTICE.txt', captureResult.truncationNotice);
+            showToast(captureResult.truncationNotice);
           }
         }
-      } catch (e) {
-        console.warn('Screenshot in zip skipped:', e);
+      } catch (ssErr) {
+        console.warn('Screenshot in zip skipped due to error:', ssErr);
+        folder.file('SCREENSHOT_NOTICE.txt', `Screenshots could not be captured: ${ssErr.message}\nAll markdown specifications (DESIGN.md, UI.md, FULL_CLONE.md) are complete.`);
+        showToast(`Screenshots skipped: ${ssErr.message}`);
       }
     }
 
-    setCaptureProgress(90, 'Generating ZIP package...');
+    setCaptureProgress(92, 'Generating final ZIP bundle...');
     const zipBlob = await zip.generateAsync({
       type: 'blob',
       compression: 'DEFLATE',
@@ -961,3 +978,4 @@ if (document.readyState === 'loading') {
 } else {
   initPopup();
 }
+
